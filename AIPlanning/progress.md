@@ -48,18 +48,31 @@
 
 ---
 
+### Phase 3 + 3.5: Health Data & Calendar Integration ✅
+**Commit**: `97f9b3d` — "Phase 3 + 3.5: Health Data & Calendar Integration"
+**Date**: 2026-02-15
+
+**What was built:**
+- **HealthConnectDataSource** — Reads sleep sessions, heart rate, steps, weight, body fat, blood pressure, HRV from Health Connect API
+- **HealthConnectMapper** — Maps Health Connect records to domain model fields
+- **HealthMetricsRepositoryImpl** — Merges Health Connect + Eight Sleep data, calculates 7-day rolling HRV average from Room history, persists to Room
+- **FetchMorningMetricsUseCase** — Returns `Result<HealthMetrics>` from repository
+- **DetermineRecoveryStatusUseCase** — Pure logic: HRV vs 7-day avg → ACTIVE_RECOVERY / MODERATE / FULL_SEND
+- **CalendarDataSource** — Queries CalendarContract.Events via ContentResolver
+- **SportEventDetector** — Case-insensitive keyword matching with manual override support
+- **CalendarRepositoryImpl** — Builds WeekSchedule with game days and available training slots, persists sport config as JSON in SharedPreferences
+- **GetWeekScheduleUseCase** — Delegates to CalendarRepository
+- **RepositoryModule** updated with HealthMetricsRepository + CalendarRepository bindings
+- **CalendarModule** updated with @Named("calendar") SharedPreferences provider
+
+**Files created/modified**: 11 files, 575 lines added
+
+---
+
 ## Remaining Phases
 
-### Phase 3: Health Data Integration
-- Health Connect permission flow + data source (Sleep, HR, Steps, Weight, BP, Body Fat)
-- Eight Sleep OAuth2 auth flow + data source (HRV, sleep stages, HR)
-- HealthMetricsRepository (merge Health Connect + Eight Sleep)
-- FetchMorningMetricsUseCase, DetermineRecoveryStatusUseCase
-
-### Phase 3.5: Calendar Integration
-- CalendarDataSource (CalendarContract API)
-- SportEventDetector (keyword matching + manual overrides)
-- CalendarRepository, GetWeekScheduleUseCase
+### Phase 3: Health Data Integration ✅ COMPLETE
+### Phase 3.5: Calendar Integration ✅ COMPLETE
 
 ### Phase 4: AI Engine (Gemini 2.5 Pro)
 - GeminiClient wrapper (Firebase AI Logic SDK)
