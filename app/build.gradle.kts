@@ -100,6 +100,9 @@ dependencies {
     // Health Connect
     implementation(libs.health.connect)
 
+    // Google Sign-In
+    implementation(libs.play.services.auth)
+
     // Testing
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.mockk)

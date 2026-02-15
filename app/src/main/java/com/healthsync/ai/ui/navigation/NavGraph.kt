@@ -23,7 +23,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.healthsync.ai.ui.screen.auth.AuthScreen
 import com.healthsync.ai.ui.screen.morning_briefing.MorningBriefingScreen
+import com.healthsync.ai.ui.screen.onboarding.OnboardingScreen
 
 data class BottomNavItem(
     val label: String,
@@ -72,9 +74,32 @@ fun NavGraph() {
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = Screen.MorningBriefing.route,
+            startDestination = Screen.Auth.route,
             modifier = Modifier.padding(innerPadding)
         ) {
+            composable(Screen.Auth.route) {
+                AuthScreen(
+                    onNavigateToOnboarding = {
+                        navController.navigate(Screen.Onboarding.route) {
+                            popUpTo(Screen.Auth.route) { inclusive = true }
+                        }
+                    },
+                    onNavigateToMorningBriefing = {
+                        navController.navigate(Screen.MorningBriefing.route) {
+                            popUpTo(Screen.Auth.route) { inclusive = true }
+                        }
+                    }
+                )
+            }
+            composable(Screen.Onboarding.route) {
+                OnboardingScreen(
+                    onComplete = {
+                        navController.navigate(Screen.MorningBriefing.route) {
+                            popUpTo(Screen.Onboarding.route) { inclusive = true }
+                        }
+                    }
+                )
+            }
             composable(Screen.MorningBriefing.route) {
                 MorningBriefingScreen()
             }

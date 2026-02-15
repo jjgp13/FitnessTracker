@@ -21,6 +21,7 @@ hiltWork = "1.2.0"
 securityCrypto = "1.1.0-alpha06"
 healthConnect = "1.1.0-alpha10"
 googleServices = "4.4.2"
+playServicesAuth = "21.3.0"
 junit = "5.10.3"
 mockk = "1.13.13"
 turbine = "1.2.0"
@@ -83,6 +84,9 @@ security-crypto = { group = "androidx.security", name = "security-crypto", versi
 
 # Health Connect
 health-connect = { group = "androidx.health.connect", name = "connect-client", version.ref = "healthConnect" }
+
+# Google Sign-In
+play-services-auth = { group = "com.google.android.gms", name = "play-services-auth", version.ref = "playServicesAuth" }
 
 # Testing
 junit-jupiter = { group = "org.junit.jupiter", name = "junit-jupiter", version.ref = "junit" }
