@@ -74,5 +74,9 @@ class AuthViewModel @Inject constructor(
         _navigationTarget.value = null
     }
 
+    fun onSignInError(message: String) {
+        _uiState.value = AuthUiState(status = AuthStatus.ERROR, errorMessage = message)
+    }
+
     enum class NavigationTarget { ONBOARDING, MORNING_BRIEFING }
 }

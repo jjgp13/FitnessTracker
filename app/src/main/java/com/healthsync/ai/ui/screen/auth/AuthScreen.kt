@@ -66,7 +66,12 @@ fun AuthScreen(
             try {
                 val account = task.getResult(ApiException::class.java)
                 account?.idToken?.let { viewModel.signInWithGoogle(it) }
-            } catch (_: ApiException) { }
+                    ?: viewModel.onSignInError("No ID token received")
+            } catch (e: ApiException) {
+                viewModel.onSignInError("Google Sign-In failed: ${e.statusCode} - ${e.message}")
+            }
+        } else {
+            viewModel.onSignInError("Sign-in cancelled (resultCode: ${result.resultCode})")
         }
     }
 
