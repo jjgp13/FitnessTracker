@@ -25,7 +25,11 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.healthsync.ai.ui.screen.auth.AuthScreen
 import com.healthsync.ai.ui.screen.morning_briefing.MorningBriefingScreen
+import com.healthsync.ai.ui.screen.nutrition.NutritionScreen
 import com.healthsync.ai.ui.screen.onboarding.OnboardingScreen
+import com.healthsync.ai.ui.screen.schedule.ScheduleScreen
+import com.healthsync.ai.ui.screen.settings.SettingsScreen
+import com.healthsync.ai.ui.screen.workout.WorkoutDetailScreen
 
 data class BottomNavItem(
     val label: String,
@@ -101,16 +105,39 @@ fun NavGraph() {
                 )
             }
             composable(Screen.MorningBriefing.route) {
-                MorningBriefingScreen()
+                MorningBriefingScreen(
+                    onNavigateToWorkout = {
+                        navController.navigate(Screen.WorkoutDetail.route)
+                    },
+                    onNavigateToNutrition = {
+                        navController.navigate(Screen.Nutrition.route)
+                    }
+                )
+            }
+            composable(Screen.WorkoutDetail.route) {
+                WorkoutDetailScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+            composable(Screen.Nutrition.route) {
+                NutritionScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
             }
             composable(Screen.Schedule.route) {
-                PlaceholderScreen("Schedule")
+                ScheduleScreen()
             }
             composable(Screen.History.route) {
                 PlaceholderScreen("History")
             }
             composable(Screen.Settings.route) {
-                PlaceholderScreen("Settings")
+                SettingsScreen(
+                    onSignOut = {
+                        navController.navigate(Screen.Auth.route) {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    }
+                )
             }
         }
     }
