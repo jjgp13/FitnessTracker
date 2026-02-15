@@ -2,10 +2,12 @@ package com.healthsync.ai.di
 
 import com.healthsync.ai.data.repository.AuthRepositoryImpl
 import com.healthsync.ai.data.repository.CalendarRepositoryImpl
+import com.healthsync.ai.data.repository.DailyPlanRepositoryImpl
 import com.healthsync.ai.data.repository.HealthMetricsRepositoryImpl
 import com.healthsync.ai.data.repository.UserProfileRepositoryImpl
 import com.healthsync.ai.domain.repository.AuthRepository
 import com.healthsync.ai.domain.repository.CalendarRepository
+import com.healthsync.ai.domain.repository.DailyPlanRepository
 import com.healthsync.ai.domain.repository.HealthMetricsRepository
 import com.healthsync.ai.domain.repository.UserProfileRepository
 import dagger.Binds
@@ -33,4 +35,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindCalendarRepository(impl: CalendarRepositoryImpl): CalendarRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindDailyPlanRepository(impl: DailyPlanRepositoryImpl): DailyPlanRepository
 }
