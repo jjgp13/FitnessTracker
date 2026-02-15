@@ -88,6 +88,31 @@
 
 ---
 
+### Phase 5: UI Screens ✅
+**Commit**: `4f5d920` — "Phase 5: UI Screens"
+**Date**: 2026-02-15
+
+**Reusable Components (6):**
+- **MetricCard** — Color-coded health metric card (icon, label, value, unit)
+- **WorkoutCard** — Clickable workout summary (type icon, duration, exercise count)
+- **MealCard** — Meal display with macro badges (P/C/F grams + calories)
+- **ScheduleCard** — Day context banner (GAME_DAY/PRE_GAME/POST_GAME/TRAINING_DAY/REST_DAY)
+- **RecoveryBanner** — Full-width color-coded recovery status (green/yellow/red)
+- **LoadingIndicator** — Centered spinner with optional message
+
+**Screens + ViewModels (5 pairs):**
+- **MorningBriefingScreen** — Main dashboard: greeting, recovery banner, schedule context, health metrics LazyRow, workout card, nutrition summary, coach notes. Handles loading/error/success states.
+- **WorkoutDetailScreen** — TopAppBar with back nav, warm-up/main block/cool-down sections with exercise details
+- **NutritionScreen** — Calorie target, macro progress bars (C/P/F), meal + snack cards
+- **ScheduleScreen** — 7-day week view with game day badges, sport event icons, training slot indicators
+- **SettingsScreen** — User profile, sport keyword management, sign out
+
+**NavGraph** — Updated with WorkoutDetail/Nutrition routes, replaced all placeholders
+
+**Files created/modified**: 17 files, 1842 lines added
+
+---
+
 ## Remaining Phases
 
 ### Phase 3: Health Data Integration ✅ COMPLETE
@@ -95,9 +120,7 @@
 
 ### Phase 4: AI Engine (Gemini 2.5 Pro) ✅ COMPLETE
 
-### Phase 5: UI Screens
-- Morning Briefing dashboard, Workout Detail, Nutrition, Schedule, Settings
-- Reusable composables (MetricCard, WorkoutCard, MealCard, ScheduleCard)
+### Phase 5: UI Screens ✅ COMPLETE
 
 ### Phase 6: Background Processing & History
 - MorningDataFetchWorker, FirebaseSyncWorker
