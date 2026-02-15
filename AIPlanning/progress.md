@@ -69,16 +69,31 @@
 
 ---
 
+### Phase 4: AI Engine (Gemini 2.5 Pro) ✅
+**Commit**: `a88dc5e` — "Phase 4: AI Engine (Gemini 2.5 Pro) + tech guide"
+**Date**: 2026-02-15
+
+**What was built:**
+- **GeminiClient** — Wraps Firebase AI Logic `GenerativeModel.generateContent()` with error handling, returns `Result<String>`
+- **PromptBuilder** — Utility object:
+  - `buildSystemInstruction(profile)` — Sports Scientist + Nutritionist persona with user context
+  - `buildDailyPlanPrompt(metrics, recovery, schedule)` — Daily prompt with health data, recovery status, week schedule, day context (PRE_GAME/GAME_DAY/POST_GAME/TRAINING_DAY)
+  - `determineDayContext(today, schedule)` — Classifies today relative to game days
+- **DailyPlanResponse DTOs** — `@Serializable` classes matching Gemini JSON output with `toDomain()` mappers
+- **DailyPlanRepositoryImpl** — Full pipeline: Room cache check → get profile/metrics/schedule → determine recovery → build prompt → call Gemini → parse JSON → cache in Room → return DailyPlan
+- **GenerateDailyPlanUseCase** — Delegates to repository, wraps in `Result`
+- **tech-guide.md** — Added to AIPlanning: deep dive on Kotlin, Compose, Hilt, Room, Firebase, Retrofit, Health Connect for engineers new to the stack
+
+**Files created/modified**: 7 files, 920 lines added
+
+---
+
 ## Remaining Phases
 
 ### Phase 3: Health Data Integration ✅ COMPLETE
 ### Phase 3.5: Calendar Integration ✅ COMPLETE
 
-### Phase 4: AI Engine (Gemini 2.5 Pro)
-- GeminiClient wrapper (Firebase AI Logic SDK)
-- PromptBuilder (system instruction + schedule context)
-- Schedule-aware prompt logic (pre-game/game day/post-game)
-- GenerateDailyPlanUseCase, DailyPlanRepository
+### Phase 4: AI Engine (Gemini 2.5 Pro) ✅ COMPLETE
 
 ### Phase 5: UI Screens
 - Morning Briefing dashboard, Workout Detail, Nutrition, Schedule, Settings
