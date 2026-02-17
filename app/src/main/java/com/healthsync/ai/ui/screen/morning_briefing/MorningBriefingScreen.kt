@@ -4,22 +4,22 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.MonitorHeart
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -160,16 +160,14 @@ private fun MorningBriefingContent(
                 text = "Health Metrics",
                 style = MaterialTheme.typography.titleMedium
             )
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(end = 16.dp)
-            ) {
-                items(buildMetricItems(metrics)) { item ->
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                buildMetricItems(metrics).forEach { item ->
                     MetricCard(
                         icon = item.icon,
                         label = item.label,
                         value = item.value,
                         unit = item.unit,
+                        sourceInfo = item.sourceInfo,
                         status = item.status
                     )
                 }
@@ -289,6 +287,7 @@ private data class MetricItem(
     val label: String,
     val value: String,
     val unit: String?,
+    val sourceInfo: String?,
     val status: MetricStatus
 )
 
@@ -296,10 +295,10 @@ private fun buildMetricItems(metrics: HealthMetrics): List<MetricItem> {
     val today = LocalDate.now()
     val yesterday = today.minusDays(1)
 
-    fun formatSourceDate(key: String): String {
+    fun formatSourceDate(key: String): String? {
         val source = metrics.dataSources[key]
         val dateStr = metrics.metricDates[key]
-        if (source == null) return "—"
+        if (source == null) return null
         val dateLabel = when {
             dateStr == null -> ""
             dateStr == today.toString() -> "Today"
@@ -330,10 +329,27 @@ private fun buildMetricItems(metrics: HealthMetrics): List<MetricItem> {
         else -> MetricStatus.ALERT
     }
 
-    return listOf(
-        MetricItem(Icons.Default.MonitorHeart, "HRV", "%.0f".format(metrics.hrvMs), "ms · ${formatSourceDate("hrv")}", hrvStatus),
-        MetricItem(Icons.Default.Bedtime, "Sleep", "%.1f".format(sleepHours), "hrs · ${formatSourceDate("sleep")}", sleepStatus),
-        MetricItem(Icons.Default.Favorite, "Resting HR", "${metrics.restingHeartRate}", "bpm · ${formatSourceDate("restingHr")}", hrStatus),
-        MetricItem(Icons.AutoMirrored.Filled.DirectionsWalk, "Steps", "%,d".format(metrics.steps), "${formatSourceDate("steps")}", MetricStatus.GOOD)
+    val items = mutableListOf(
+        MetricItem(Icons.Default.Bedtime, "Sleep", "%.1f".format(sleepHours), "hrs", formatSourceDate("sleep"), sleepStatus),
+        MetricItem(Icons.Default.MonitorHeart, "HRV", "%.0f".format(metrics.hrvMs), "ms", formatSourceDate("hrv"), hrvStatus),
+        MetricItem(Icons.Default.Favorite, "Resting HR", "${metrics.restingHeartRate}", "bpm", formatSourceDate("restingHr"), hrStatus),
+        MetricItem(Icons.AutoMirrored.Filled.DirectionsWalk, "Steps (Yesterday)", "%,d".format(metrics.steps), null, formatSourceDate("steps"), MetricStatus.GOOD)
     )
+
+    metrics.weight?.let {
+        items.add(MetricItem(Icons.Default.FitnessCenter, "Weight", "%.1f".format(it), "kg", formatSourceDate("weight"), MetricStatus.GOOD))
+    }
+    metrics.bodyFatPercentage?.let {
+        items.add(MetricItem(Icons.Default.Person, "Body Fat", "%.1f".format(it), "%", formatSourceDate("bodyFat"), MetricStatus.GOOD))
+    }
+    if (metrics.bloodPressureSystolic != null && metrics.bloodPressureDiastolic != null) {
+        val bpStatus = when {
+            metrics.bloodPressureSystolic <= 120 && metrics.bloodPressureDiastolic <= 80 -> MetricStatus.GOOD
+            metrics.bloodPressureSystolic <= 140 && metrics.bloodPressureDiastolic <= 90 -> MetricStatus.WARNING
+            else -> MetricStatus.ALERT
+        }
+        items.add(MetricItem(Icons.Default.Speed, "Blood Pressure", "${metrics.bloodPressureSystolic}/${metrics.bloodPressureDiastolic}", "mmHg", formatSourceDate("bloodPressure"), bpStatus))
+    }
+
+    return items
 }

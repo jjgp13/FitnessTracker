@@ -1,9 +1,10 @@
 package com.healthsync.ai.ui.components
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -27,6 +28,7 @@ fun MetricCard(
     label: String,
     value: String,
     unit: String? = null,
+    sourceInfo: String? = null,
     status: MetricStatus = MetricStatus.GOOD,
     modifier: Modifier = Modifier
 ) {
@@ -37,38 +39,51 @@ fun MetricCard(
     }
 
     Card(
-        modifier = modifier.width(140.dp),
+        modifier = modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Icon(
                 imageVector = icon,
                 contentDescription = label,
                 tint = statusColor,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(28.dp)
             )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Row(verticalAlignment = Alignment.Bottom) {
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = value,
-                    style = MaterialTheme.typography.titleLarge,
-                    color = statusColor
+                    text = label,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                if (unit != null) {
-                    Spacer(modifier = Modifier.width(2.dp))
+                Row(verticalAlignment = Alignment.Bottom) {
                     Text(
-                        text = unit,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = value,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = statusColor
                     )
+                    if (unit != null) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = unit,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
+            }
+            if (sourceInfo != null) {
+                Text(
+                    text = sourceInfo,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }
