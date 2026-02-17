@@ -27,6 +27,7 @@ import javax.inject.Inject
 data class MorningBriefingUiState(
     val isLoading: Boolean = true,
     val errorMessage: String? = null,
+    val aiWarning: String? = null,
     val healthMetrics: HealthMetrics? = null,
     val recoveryStatus: RecoveryStatus? = null,
     val dailyPlan: DailyPlan? = null,
@@ -84,7 +85,7 @@ class MorningBriefingViewModel @Inject constructor(
 
     private fun loadAll() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            _uiState.update { it.copy(isLoading = true, errorMessage = null, aiWarning = null) }
 
             try {
                 // Load user name
@@ -106,10 +107,23 @@ class MorningBriefingViewModel @Inject constructor(
                 val schedule = getWeekScheduleUseCase(weekStart)
                 _uiState.update { it.copy(weekSchedule = schedule) }
 
-                // Generate daily plan
+                // Generate daily plan (non-blocking — show metrics even if AI fails)
                 val planResult = generateDailyPlanUseCase(today)
-                val plan = planResult.getOrThrow()
-                _uiState.update { it.copy(dailyPlan = plan, isLoading = false) }
+                planResult.onSuccess { plan ->
+                    _uiState.update { it.copy(dailyPlan = plan) }
+                }.onFailure { e ->
+                    val msg = when {
+                        e.message?.contains("quota", ignoreCase = true) == true ||
+                        e.message?.contains("429", ignoreCase = true) == true ||
+                        e.message?.contains("RESOURCE_EXHAUSTED", ignoreCase = true) == true ->
+                            "Gemini API quota exceeded. Your health metrics are shown below. AI plan will retry later."
+                        else ->
+                            "AI plan unavailable: ${e.message}"
+                    }
+                    _uiState.update { it.copy(aiWarning = msg) }
+                }
+
+                _uiState.update { it.copy(isLoading = false) }
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(

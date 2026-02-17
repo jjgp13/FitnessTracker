@@ -123,6 +123,23 @@ private fun MorningBriefingContent(
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
+        // AI Warning Banner (quota exceeded, etc.)
+        uiState.aiWarning?.let { warning ->
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                )
+            ) {
+                Text(
+                    text = warning,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    modifier = Modifier.padding(12.dp)
+                )
+            }
+        }
+
         // Recovery Banner
         uiState.recoveryStatus?.let { status ->
             RecoveryBanner(recoveryStatus = status)
