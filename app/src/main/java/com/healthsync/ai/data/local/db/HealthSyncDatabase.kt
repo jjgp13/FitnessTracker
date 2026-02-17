@@ -15,7 +15,7 @@ import com.healthsync.ai.data.local.db.entity.UserProfileEntity
         DailyPlanEntity::class,
         UserProfileEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class HealthSyncDatabase : RoomDatabase() {

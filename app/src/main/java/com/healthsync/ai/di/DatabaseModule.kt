@@ -24,7 +24,7 @@ object DatabaseModule {
             context,
             HealthSyncDatabase::class.java,
             "healthsync_db"
-        ).build()
+        ).fallbackToDestructiveMigration().build()
     }
 
     @Provides

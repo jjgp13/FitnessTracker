@@ -313,9 +313,9 @@ private fun buildMetricItems(metrics: HealthMetrics): List<MetricItem> {
     }
 
     return listOf(
-        MetricItem(Icons.Default.MonitorHeart, "HRV", "%.0f".format(metrics.hrvMs), "ms", hrvStatus),
-        MetricItem(Icons.Default.Bedtime, "Sleep", "%.1f".format(sleepHours), "hrs", sleepStatus),
-        MetricItem(Icons.Default.Favorite, "Resting HR", "${metrics.restingHeartRate}", "bpm", hrStatus),
-        MetricItem(Icons.AutoMirrored.Filled.DirectionsWalk, "Steps", "%,d".format(metrics.steps), null, MetricStatus.GOOD)
+        MetricItem(Icons.Default.MonitorHeart, "HRV", "%.0f".format(metrics.hrvMs), "ms · ${metrics.dataSources["hrv"] ?: "—"}", hrvStatus),
+        MetricItem(Icons.Default.Bedtime, "Sleep", "%.1f".format(sleepHours), "hrs · ${metrics.dataSources["sleep"] ?: "—"}", sleepStatus),
+        MetricItem(Icons.Default.Favorite, "Resting HR", "${metrics.restingHeartRate}", "bpm · ${metrics.dataSources["restingHr"] ?: "—"}", hrStatus),
+        MetricItem(Icons.AutoMirrored.Filled.DirectionsWalk, "Steps", "%,d".format(metrics.steps), "steps · ${metrics.dataSources["steps"] ?: "—"}", MetricStatus.GOOD)
     )
 }

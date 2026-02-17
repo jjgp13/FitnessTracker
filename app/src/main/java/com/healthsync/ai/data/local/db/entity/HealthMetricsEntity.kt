@@ -17,5 +17,6 @@ data class HealthMetricsEntity(
     val bloodPressureDiastolic: Int?,
     val steps: Int,
     val weight: Double?,
-    val bodyFatPercentage: Double?
+    val bodyFatPercentage: Double?,
+    val dataSources: String = "{}"
 )

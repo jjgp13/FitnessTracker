@@ -124,6 +124,21 @@
 
 ---
 
+### Data Source Refactor + Gemini Model Switch ✅
+**Commit**: (pending)
+**Date**: 2026-02-17
+
+**What was changed:**
+- **Data source priority system**: Eight Sleep → Fitbit (Health Connect) fallback for sleep, resting HR, HRV. Withings labels for weight/body fat/blood pressure.
+- **Steps**: Now reads **yesterday's** data from Fitbit (via Health Connect) so Gemini knows prior day activity
+- **Data source tracking**: Added `dataSources: Map<String, String>` to HealthMetrics model. Each metric card in the UI shows where its data came from (e.g., "ms · Eight Sleep" or "hrs · Fitbit")
+- **Gemini model**: Switched from `gemini-2.5-pro` (5 req/min, 25 req/day free) to `gemini-2.0-flash` (15 req/min, 1500 req/day free)
+- **Room DB**: Bumped to v2 with destructive migration (dev phase)
+
+**Files modified**: 8 files (HealthMetrics model, Entity, Mapper, RepositoryImpl, Database, DatabaseModule, AIModule, MorningBriefingScreen)
+
+---
+
 ## Remaining Phases
 
 ### Phase 3: Health Data Integration ✅ COMPLETE

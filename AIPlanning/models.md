@@ -15,9 +15,23 @@ data class HealthMetrics(
     val bloodPressureDiastolic: Int?,
     val steps: Int,
     val weight: Double?,
-    val bodyFatPercentage: Double?
+    val bodyFatPercentage: Double?,
+    val dataSources: Map<String, String> = emptyMap()
 )
 ```
+
+## Data Source Priority (Primary → Fallback)
+| Metric | Primary Source | Fallback Source | Notes |
+|--------|---------------|-----------------|-------|
+| Sleep (duration, deep, REM, score) | Eight Sleep | Fitbit (via Health Connect) | Eight Sleep provides sleep score |
+| Resting HR | Eight Sleep (min HR from timeseries) | Fitbit (via Health Connect) | Lowest 10% average from Fitbit |
+| HRV | Eight Sleep (avg from timeseries) | Fitbit (via Health Connect) | HRV RMSSD |
+| Steps | Fitbit (via Health Connect) | — | **Yesterday's data** (prior day activity) |
+| Weight | Withings (via Health Connect) | — | Last 30 days, most recent |
+| Body Fat | Withings (via Health Connect) | — | Last 30 days, most recent |
+| Blood Pressure | Withings (via Health Connect) | — | Last 30 days, most recent |
+
+The `dataSources` map tracks which source provided each metric (keys: `sleep`, `restingHr`, `hrv`, `steps`, `weight`, `bodyFat`, `bloodPressure`). Displayed in the UI next to each metric value.
 
 ## DailyPlan + Workout + NutritionPlan
 ```kotlin

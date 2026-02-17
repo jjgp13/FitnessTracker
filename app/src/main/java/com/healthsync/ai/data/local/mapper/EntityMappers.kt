@@ -12,6 +12,7 @@ import com.healthsync.ai.domain.model.UserProfile
 import com.healthsync.ai.domain.model.Workout
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.time.LocalDate
 
@@ -31,7 +32,8 @@ fun HealthMetricsEntity.toDomain(): HealthMetrics = HealthMetrics(
     bloodPressureDiastolic = bloodPressureDiastolic,
     steps = steps,
     weight = weight,
-    bodyFatPercentage = bodyFatPercentage
+    bodyFatPercentage = bodyFatPercentage,
+    dataSources = json.decodeFromString<Map<String, String>>(dataSources)
 )
 
 fun HealthMetrics.toEntity(): HealthMetricsEntity = HealthMetricsEntity(
@@ -47,7 +49,8 @@ fun HealthMetrics.toEntity(): HealthMetricsEntity = HealthMetricsEntity(
     bloodPressureDiastolic = bloodPressureDiastolic,
     steps = steps,
     weight = weight,
-    bodyFatPercentage = bodyFatPercentage
+    bodyFatPercentage = bodyFatPercentage,
+    dataSources = json.encodeToString(dataSources)
 )
 
 fun UserProfileEntity.toDomain(): UserProfile = UserProfile(

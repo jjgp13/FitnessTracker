@@ -18,6 +18,6 @@ object AiModule {
     @Singleton
     fun provideGeminiModel(): GenerativeModel {
         return Firebase.ai(backend = GenerativeBackend.googleAI())
-            .generativeModel("gemini-2.5-pro")
+            .generativeModel("gemini-2.0-flash")
     }
 }
