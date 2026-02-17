@@ -16,5 +16,6 @@ data class HealthMetrics(
     val steps: Int,
     val weight: Double?,
     val bodyFatPercentage: Double?,
-    val dataSources: Map<String, String> = emptyMap()
+    val dataSources: Map<String, String> = emptyMap(),
+    val metricDates: Map<String, String> = emptyMap()
 )

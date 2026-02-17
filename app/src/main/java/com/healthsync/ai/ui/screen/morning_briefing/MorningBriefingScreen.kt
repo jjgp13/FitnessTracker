@@ -293,6 +293,24 @@ private data class MetricItem(
 )
 
 private fun buildMetricItems(metrics: HealthMetrics): List<MetricItem> {
+    val today = LocalDate.now()
+    val yesterday = today.minusDays(1)
+
+    fun formatSourceDate(key: String): String {
+        val source = metrics.dataSources[key]
+        val dateStr = metrics.metricDates[key]
+        if (source == null) return "—"
+        val dateLabel = when {
+            dateStr == null -> ""
+            dateStr == today.toString() -> "Today"
+            dateStr == yesterday.toString() -> "Yesterday"
+            else -> try {
+                LocalDate.parse(dateStr).format(DateTimeFormatter.ofPattern("MMM d"))
+            } catch (_: Exception) { dateStr }
+        }
+        return if (dateLabel.isNotEmpty()) "$source · $dateLabel" else source
+    }
+
     val sleepHours = metrics.sleepDurationMinutes / 60.0
     val sleepStatus = when {
         sleepHours >= 7.0 -> MetricStatus.GOOD
@@ -313,9 +331,9 @@ private fun buildMetricItems(metrics: HealthMetrics): List<MetricItem> {
     }
 
     return listOf(
-        MetricItem(Icons.Default.MonitorHeart, "HRV", "%.0f".format(metrics.hrvMs), "ms · ${metrics.dataSources["hrv"] ?: "—"}", hrvStatus),
-        MetricItem(Icons.Default.Bedtime, "Sleep", "%.1f".format(sleepHours), "hrs · ${metrics.dataSources["sleep"] ?: "—"}", sleepStatus),
-        MetricItem(Icons.Default.Favorite, "Resting HR", "${metrics.restingHeartRate}", "bpm · ${metrics.dataSources["restingHr"] ?: "—"}", hrStatus),
-        MetricItem(Icons.AutoMirrored.Filled.DirectionsWalk, "Steps", "%,d".format(metrics.steps), "steps · ${metrics.dataSources["steps"] ?: "—"}", MetricStatus.GOOD)
+        MetricItem(Icons.Default.MonitorHeart, "HRV", "%.0f".format(metrics.hrvMs), "ms · ${formatSourceDate("hrv")}", hrvStatus),
+        MetricItem(Icons.Default.Bedtime, "Sleep", "%.1f".format(sleepHours), "hrs · ${formatSourceDate("sleep")}", sleepStatus),
+        MetricItem(Icons.Default.Favorite, "Resting HR", "${metrics.restingHeartRate}", "bpm · ${formatSourceDate("restingHr")}", hrStatus),
+        MetricItem(Icons.AutoMirrored.Filled.DirectionsWalk, "Steps", "%,d".format(metrics.steps), "${formatSourceDate("steps")}", MetricStatus.GOOD)
     )
 }

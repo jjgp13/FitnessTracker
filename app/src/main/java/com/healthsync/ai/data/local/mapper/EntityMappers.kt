@@ -33,7 +33,8 @@ fun HealthMetricsEntity.toDomain(): HealthMetrics = HealthMetrics(
     steps = steps,
     weight = weight,
     bodyFatPercentage = bodyFatPercentage,
-    dataSources = json.decodeFromString<Map<String, String>>(dataSources)
+    dataSources = json.decodeFromString<Map<String, String>>(dataSources),
+    metricDates = json.decodeFromString<Map<String, String>>(metricDates)
 )
 
 fun HealthMetrics.toEntity(): HealthMetricsEntity = HealthMetricsEntity(
@@ -50,7 +51,8 @@ fun HealthMetrics.toEntity(): HealthMetricsEntity = HealthMetricsEntity(
     steps = steps,
     weight = weight,
     bodyFatPercentage = bodyFatPercentage,
-    dataSources = json.encodeToString(dataSources)
+    dataSources = json.encodeToString(dataSources),
+    metricDates = json.encodeToString(metricDates)
 )
 
 fun UserProfileEntity.toDomain(): UserProfile = UserProfile(

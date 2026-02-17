@@ -18,5 +18,6 @@ data class HealthMetricsEntity(
     val steps: Int,
     val weight: Double?,
     val bodyFatPercentage: Double?,
-    val dataSources: String = "{}"
+    val dataSources: String = "{}",
+    val metricDates: String = "{}"
 )

@@ -125,7 +125,7 @@
 ---
 
 ### Data Source Refactor + Gemini Model Switch ✅
-**Commit**: (pending)
+**Commit**: `fdcfb32`
 **Date**: 2026-02-17
 
 **What was changed:**
@@ -136,6 +136,21 @@
 - **Room DB**: Bumped to v2 with destructive migration (dev phase)
 
 **Files modified**: 8 files (HealthMetrics model, Entity, Mapper, RepositoryImpl, Database, DatabaseModule, AIModule, MorningBriefingScreen)
+
+---
+
+### Historical Metric Fallback + Date Tracking ✅
+**Commit**: (pending)
+**Date**: 2026-02-17
+
+**What was changed:**
+- **Metric date tracking**: Added `metricDates: Map<String, String>` to HealthMetrics. Each metric now records the date when it was measured.
+- **Historical fallback**: If no data exists for today, the app looks back (3 days for sleep/HR/HRV, 90 days for weight/body fat/BP) and uses the most recent available reading.
+- **UI date labels**: Each metric card shows source + date (e.g., "Fitbit · Today", "Withings · Feb 14", "Eight Sleep · Yesterday")
+- **HealthConnectDataSource**: `readWeight()`, `readBodyFat()`, `readBloodPressure()` now return date of reading. Added range-based methods (`readSleepDataRange`, `readHeartRateRange`, `readHrvDataRange`) for fallback queries.
+- **Room DB**: Bumped to v3
+
+**Files modified**: 7 files
 
 ---
 

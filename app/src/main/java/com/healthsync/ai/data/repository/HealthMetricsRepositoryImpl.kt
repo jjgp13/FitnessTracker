@@ -23,6 +23,7 @@ class HealthMetricsRepositoryImpl @Inject constructor(
 
     override suspend fun fetchTodayMetrics(): HealthMetrics {
         val dataSources = mutableMapOf<String, String>()
+        val metricDates = mutableMapOf<String, String>()
         val today = LocalDate.now()
         val yesterday = today.minusDays(1)
 
@@ -33,7 +34,6 @@ class HealthMetricsRepositoryImpl @Inject constructor(
         if (eightSleepDataSource.isAuthenticated()) {
             val result = eightSleepDataSource.getSleepMetrics(today.toString(), today.toString())
             result.getOrNull()?.sleeps?.firstOrNull()?.let { session ->
-                // Calculate sleep duration from startTime/endTime
                 if (session.startTime != null && session.endTime != null) {
                     try {
                         val start = java.time.Instant.parse(session.startTime)
@@ -41,7 +41,6 @@ class HealthMetricsRepositoryImpl @Inject constructor(
                         sleepDuration = ((end.epochSecond - start.epochSecond) / 60).toInt()
                     } catch (_: Exception) {}
                 }
-                // Deep and REM from stages
                 session.stages.forEach { stage ->
                     when (stage.stage?.lowercase()) {
                         "deep" -> deepSleep += ((stage.duration ?: 0) / 60).toInt()
@@ -49,63 +48,112 @@ class HealthMetricsRepositoryImpl @Inject constructor(
                     }
                 }
                 sleepScore = session.score
-                // HRV from timeseries
                 val hrvValues = session.timeseries?.hrv?.mapNotNull { it.value }
                 if (!hrvValues.isNullOrEmpty()) {
                     hrvMs = hrvValues.average()
                     dataSources["hrv"] = "Eight Sleep"
+                    metricDates["hrv"] = today.toString()
                 }
-                // Resting HR from timeseries (use minimum as resting)
                 val hrValues = session.timeseries?.heartRate?.mapNotNull { it.value }
                 if (!hrValues.isNullOrEmpty()) {
                     restingHr = hrValues.min().toInt()
                     dataSources["restingHr"] = "Eight Sleep"
+                    metricDates["restingHr"] = today.toString()
                 }
-                if (sleepDuration > 0) dataSources["sleep"] = "Eight Sleep"
+                if (sleepDuration > 0) {
+                    dataSources["sleep"] = "Eight Sleep"
+                    metricDates["sleep"] = today.toString()
+                }
             }
         }
 
-        // Fallback to Health Connect (Fitbit) for sleep if Eight Sleep had no data
+        // Fallback to Health Connect (Fitbit) for sleep — try today, then yesterday
         if (sleepDuration == 0) {
-            val sleepSessions = healthConnectDataSource.readSleepData(today)
+            var sleepSessions = healthConnectDataSource.readSleepData(today)
+            var sleepDate = today
+            if (sleepSessions.isEmpty()) {
+                sleepSessions = healthConnectDataSource.readSleepData(yesterday)
+                sleepDate = yesterday
+            }
             sleepDuration = HealthConnectMapper.mapSleepDuration(sleepSessions)
             deepSleep = HealthConnectMapper.mapDeepSleepMinutes(sleepSessions)
             remSleep = HealthConnectMapper.mapRemSleepMinutes(sleepSessions)
-            if (sleepDuration > 0) dataSources["sleep"] = "Fitbit"
+            if (sleepDuration > 0) {
+                dataSources["sleep"] = "Fitbit"
+                metricDates["sleep"] = sleepDate.toString()
+            }
         }
 
-        // Fallback HR from Health Connect (Fitbit)
+        // Fallback HR — try today, then last 3 days
         if (restingHr == 0) {
             restingHr = healthConnectDataSource.readHeartRate(today) ?: 0
-            if (restingHr > 0) dataSources["restingHr"] = "Fitbit"
+            if (restingHr > 0) {
+                dataSources["restingHr"] = "Fitbit"
+                metricDates["restingHr"] = today.toString()
+            } else {
+                val fallbackHr = healthConnectDataSource.readHeartRateRange(today.minusDays(3), yesterday)
+                if (fallbackHr != null && fallbackHr > 0) {
+                    restingHr = fallbackHr
+                    dataSources["restingHr"] = "Fitbit"
+                    metricDates["restingHr"] = yesterday.toString()
+                }
+            }
         }
 
-        // Fallback HRV from Health Connect (Fitbit)
+        // Fallback HRV — try today, then last 3 days
         if (hrvMs == 0.0) {
             val hrvRecords = healthConnectDataSource.readHrvData(today)
             hrvMs = HealthConnectMapper.mapHrvAverage(hrvRecords)
-            if (hrvMs > 0) dataSources["hrv"] = "Fitbit"
+            if (hrvMs > 0) {
+                dataSources["hrv"] = "Fitbit"
+                metricDates["hrv"] = today.toString()
+            } else {
+                val fallbackHrv = healthConnectDataSource.readHrvDataRange(today.minusDays(3), yesterday)
+                hrvMs = HealthConnectMapper.mapHrvAverage(fallbackHrv)
+                if (hrvMs > 0) {
+                    dataSources["hrv"] = "Fitbit"
+                    metricDates["hrv"] = yesterday.toString()
+                }
+            }
         }
 
         // STEPS: Yesterday's data from Health Connect (Fitbit)
         val steps = healthConnectDataSource.readSteps(yesterday)
-        if (steps > 0) dataSources["steps"] = "Fitbit"
+        if (steps > 0) {
+            dataSources["steps"] = "Fitbit"
+            metricDates["steps"] = yesterday.toString()
+        }
 
-        // Weight & Body Fat: from Health Connect (Withings)
-        val weight = healthConnectDataSource.readWeight()
-        if (weight != null) dataSources["weight"] = "Withings"
-        val bodyFat = healthConnectDataSource.readBodyFat()
-        if (bodyFat != null) dataSources["bodyFat"] = "Withings"
+        // Weight: from Health Connect (Withings) — already looks back 90 days
+        val weightResult = healthConnectDataSource.readWeight()
+        val weight = weightResult?.first
+        if (weightResult != null) {
+            dataSources["weight"] = "Withings"
+            metricDates["weight"] = weightResult.second.toString()
+        }
+
+        // Body Fat: from Health Connect (Withings)
+        val bodyFatResult = healthConnectDataSource.readBodyFat()
+        val bodyFat = bodyFatResult?.first
+        if (bodyFatResult != null) {
+            dataSources["bodyFat"] = "Withings"
+            metricDates["bodyFat"] = bodyFatResult.second.toString()
+        }
 
         // Blood Pressure: from Health Connect (Withings)
-        val bp = healthConnectDataSource.readBloodPressure()
-        if (bp != null) dataSources["bloodPressure"] = "Withings"
+        val bpResult = healthConnectDataSource.readBloodPressure()
+        val bpSystolic = bpResult?.first
+        val bpDiastolic = bpResult?.second
+        if (bpResult != null) {
+            dataSources["bloodPressure"] = "Withings"
+            metricDates["bloodPressure"] = bpResult.third.toString()
+        }
 
         // 7-day rolling HRV
         val recentMetrics = healthMetricsDao.getRecent(7).map { it.toDomain() }
-        val hrvValues = recentMetrics.map { it.hrvMs }.filter { it > 0 }
-        val hrvRolling7DayAvg = if (hrvValues.isNotEmpty()) {
-            (hrvValues + hrvMs).filter { it > 0 }.average()
+        val hrvValuesList = recentMetrics.map { it.hrvMs }.filter { it > 0 }
+        val hrvRolling7DayAvg = if (hrvValuesList.isNotEmpty()) {
+            (hrvValuesList + hrvMs).filter { it > 0 }.average()
         } else { hrvMs }
 
         val metrics = HealthMetrics(
@@ -117,12 +165,13 @@ class HealthMetricsRepositoryImpl @Inject constructor(
             hrvMs = hrvMs,
             hrvRolling7DayAvg = hrvRolling7DayAvg,
             restingHeartRate = restingHr,
-            bloodPressureSystolic = bp?.first,
-            bloodPressureDiastolic = bp?.second,
+            bloodPressureSystolic = bpSystolic,
+            bloodPressureDiastolic = bpDiastolic,
             steps = steps,
             weight = weight,
             bodyFatPercentage = bodyFat,
-            dataSources = dataSources
+            dataSources = dataSources,
+            metricDates = metricDates
         )
 
         healthMetricsDao.insert(metrics.toEntity())

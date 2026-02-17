@@ -97,36 +97,44 @@ class HealthConnectDataSource @Inject constructor(
         return response.records.sumOf { it.count }.toInt()
     }
 
-    suspend fun readWeight(): Double? {
+    suspend fun readWeight(): Pair<Double, LocalDate>? {
         val client = healthConnectClient ?: return null
         val end = Instant.now()
-        val start = end.minusSeconds(30L * 24 * 60 * 60) // last 30 days
+        val start = end.minusSeconds(90L * 24 * 60 * 60) // last 90 days
         val response = client.readRecords(
             ReadRecordsRequest(
                 recordType = WeightRecord::class,
                 timeRangeFilter = TimeRangeFilter.between(start, end)
             )
         )
-        return response.records.maxByOrNull { it.time }?.weight?.inKilograms
+        val record = response.records.maxByOrNull { it.time } ?: return null
+        return Pair(
+            record.weight.inKilograms,
+            record.time.atZone(ZoneId.systemDefault()).toLocalDate()
+        )
     }
 
-    suspend fun readBodyFat(): Double? {
+    suspend fun readBodyFat(): Pair<Double, LocalDate>? {
         val client = healthConnectClient ?: return null
         val end = Instant.now()
-        val start = end.minusSeconds(30L * 24 * 60 * 60)
+        val start = end.minusSeconds(90L * 24 * 60 * 60) // last 90 days
         val response = client.readRecords(
             ReadRecordsRequest(
                 recordType = BodyFatRecord::class,
                 timeRangeFilter = TimeRangeFilter.between(start, end)
             )
         )
-        return response.records.maxByOrNull { it.time }?.percentage?.value
+        val record = response.records.maxByOrNull { it.time } ?: return null
+        return Pair(
+            record.percentage.value,
+            record.time.atZone(ZoneId.systemDefault()).toLocalDate()
+        )
     }
 
-    suspend fun readBloodPressure(): Pair<Int, Int>? {
+    suspend fun readBloodPressure(): Triple<Int, Int, LocalDate>? {
         val client = healthConnectClient ?: return null
         val end = Instant.now()
-        val start = end.minusSeconds(30L * 24 * 60 * 60)
+        val start = end.minusSeconds(90L * 24 * 60 * 60) // last 90 days
         val response = client.readRecords(
             ReadRecordsRequest(
                 recordType = BloodPressureRecord::class,
@@ -134,9 +142,10 @@ class HealthConnectDataSource @Inject constructor(
             )
         )
         val latest = response.records.maxByOrNull { it.time } ?: return null
-        return Pair(
+        return Triple(
             latest.systolic.inMillimetersOfMercury.toInt(),
-            latest.diastolic.inMillimetersOfMercury.toInt()
+            latest.diastolic.inMillimetersOfMercury.toInt(),
+            latest.time.atZone(ZoneId.systemDefault()).toLocalDate()
         )
     }
 
@@ -145,6 +154,52 @@ class HealthConnectDataSource @Inject constructor(
         val zone = ZoneId.systemDefault()
         val start = date.atStartOfDay(zone).toInstant()
         val end = date.plusDays(1).atStartOfDay(zone).toInstant()
+        val response = client.readRecords(
+            ReadRecordsRequest(
+                recordType = HeartRateVariabilityRmssdRecord::class,
+                timeRangeFilter = TimeRangeFilter.between(start, end)
+            )
+        )
+        return response.records
+    }
+
+    suspend fun readSleepDataRange(startDate: LocalDate, endDate: LocalDate): List<SleepSessionRecord> {
+        val client = healthConnectClient ?: return emptyList()
+        val zone = ZoneId.systemDefault()
+        val start = startDate.atStartOfDay(zone).toInstant()
+        val end = endDate.plusDays(1).atStartOfDay(zone).toInstant()
+        val response = client.readRecords(
+            ReadRecordsRequest(
+                recordType = SleepSessionRecord::class,
+                timeRangeFilter = TimeRangeFilter.between(start, end)
+            )
+        )
+        return response.records
+    }
+
+    suspend fun readHeartRateRange(startDate: LocalDate, endDate: LocalDate): Int? {
+        val client = healthConnectClient ?: return null
+        val zone = ZoneId.systemDefault()
+        val start = startDate.atStartOfDay(zone).toInstant()
+        val end = endDate.plusDays(1).atStartOfDay(zone).toInstant()
+        val response = client.readRecords(
+            ReadRecordsRequest(
+                recordType = HeartRateRecord::class,
+                timeRangeFilter = TimeRangeFilter.between(start, end)
+            )
+        )
+        val allSamples = response.records.flatMap { it.samples }
+        if (allSamples.isEmpty()) return null
+        val sorted = allSamples.map { it.beatsPerMinute }.sorted()
+        val count = maxOf(1, sorted.size / 10)
+        return sorted.take(count).average().toInt()
+    }
+
+    suspend fun readHrvDataRange(startDate: LocalDate, endDate: LocalDate): List<HeartRateVariabilityRmssdRecord> {
+        val client = healthConnectClient ?: return emptyList()
+        val zone = ZoneId.systemDefault()
+        val start = startDate.atStartOfDay(zone).toInstant()
+        val end = endDate.plusDays(1).atStartOfDay(zone).toInstant()
         val response = client.readRecords(
             ReadRecordsRequest(
                 recordType = HeartRateVariabilityRmssdRecord::class,
