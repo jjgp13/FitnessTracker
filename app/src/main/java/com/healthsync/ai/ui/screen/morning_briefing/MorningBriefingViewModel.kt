@@ -2,6 +2,7 @@ package com.healthsync.ai.ui.screen.morning_briefing
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.healthsync.ai.data.healthconnect.HealthConnectDataSource
 import com.healthsync.ai.domain.model.DailyPlan
 import com.healthsync.ai.domain.model.HealthMetrics
 import com.healthsync.ai.domain.model.RecoveryStatus
@@ -30,7 +31,8 @@ data class MorningBriefingUiState(
     val recoveryStatus: RecoveryStatus? = null,
     val dailyPlan: DailyPlan? = null,
     val weekSchedule: WeekSchedule? = null,
-    val userName: String? = null
+    val userName: String? = null,
+    val needsHealthPermissions: Boolean = false
 )
 
 @HiltViewModel
@@ -39,18 +41,45 @@ class MorningBriefingViewModel @Inject constructor(
     private val determineRecoveryStatusUseCase: DetermineRecoveryStatusUseCase,
     private val generateDailyPlanUseCase: GenerateDailyPlanUseCase,
     private val getWeekScheduleUseCase: GetWeekScheduleUseCase,
-    private val userProfileRepository: UserProfileRepository
+    private val userProfileRepository: UserProfileRepository,
+    val healthConnectDataSource: HealthConnectDataSource
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MorningBriefingUiState())
     val uiState: StateFlow<MorningBriefingUiState> = _uiState.asStateFlow()
 
     init {
-        loadAll()
+        checkPermissionsAndLoad()
     }
 
     fun refresh() {
         loadAll()
+    }
+
+    fun onPermissionsResult(granted: Boolean) {
+        if (granted) {
+            _uiState.update { it.copy(needsHealthPermissions = false) }
+            loadAll()
+        } else {
+            _uiState.update {
+                it.copy(
+                    needsHealthPermissions = true,
+                    isLoading = false,
+                    errorMessage = "Health Connect permissions are required to show your metrics. Please grant them and tap Retry."
+                )
+            }
+        }
+    }
+
+    private fun checkPermissionsAndLoad() {
+        viewModelScope.launch {
+            val hasPermissions = healthConnectDataSource.checkPermissions()
+            if (hasPermissions) {
+                loadAll()
+            } else {
+                _uiState.update { it.copy(needsHealthPermissions = true, isLoading = false) }
+            }
+        }
     }
 
     private fun loadAll() {

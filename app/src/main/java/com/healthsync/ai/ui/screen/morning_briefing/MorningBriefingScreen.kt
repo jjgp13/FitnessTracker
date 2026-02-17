@@ -1,5 +1,6 @@
 package com.healthsync.ai.ui.screen.morning_briefing
 
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -25,10 +26,12 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.health.connect.client.PermissionController
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.healthsync.ai.domain.model.HealthMetrics
@@ -52,6 +55,21 @@ fun MorningBriefingScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+    // Health Connect permission launcher
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = PermissionController.createRequestPermissionResultContract()
+    ) { grantedPermissions ->
+        val allGranted = viewModel.healthConnectDataSource.permissions.all { it in grantedPermissions }
+        viewModel.onPermissionsResult(allGranted)
+    }
+
+    // Automatically launch permission request when needed
+    LaunchedEffect(uiState.needsHealthPermissions) {
+        if (uiState.needsHealthPermissions) {
+            permissionLauncher.launch(viewModel.healthConnectDataSource.permissions)
+        }
+    }
+
     when {
         uiState.isLoading -> {
             LoadingIndicator(message = "Preparing your morning briefing...")
@@ -59,7 +77,13 @@ fun MorningBriefingScreen(
         uiState.errorMessage != null -> {
             ErrorState(
                 message = uiState.errorMessage!!,
-                onRetry = viewModel::refresh
+                onRetry = {
+                    if (uiState.needsHealthPermissions) {
+                        permissionLauncher.launch(viewModel.healthConnectDataSource.permissions)
+                    } else {
+                        viewModel.refresh()
+                    }
+                }
             )
         }
         else -> {
