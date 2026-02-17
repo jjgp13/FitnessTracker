@@ -113,6 +113,17 @@
 
 ---
 
+### Bug Fixes & Improvements ✅
+**Commit**: `dbe2f04` — "Fix Health Connect permissions: check and request before reading data"
+**Commit**: `8369ddb` — "Handle Gemini API quota gracefully: show metrics even when AI fails"
+**Date**: 2026-02-17
+
+**What was fixed:**
+- **Health Connect permissions** — App was trying to read sleep/HR/HRV data without first requesting runtime Health Connect permissions from the user. Added `PermissionController.createRequestPermissionResultContract()` launcher in MorningBriefingScreen and permission check flow in ViewModel.
+- **Gemini quota error** — When Gemini API quota is exceeded, the entire screen showed an error. Changed AI plan generation to be non-blocking: health metrics, recovery status, and schedule now display regardless of AI availability. A warning banner shows in tertiary color when Gemini quota is exceeded.
+
+---
+
 ## Remaining Phases
 
 ### Phase 3: Health Data Integration ✅ COMPLETE
