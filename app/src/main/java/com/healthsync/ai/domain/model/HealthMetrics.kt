@@ -7,6 +7,8 @@ data class HealthMetrics(
     val sleepDurationMinutes: Int,
     val deepSleepMinutes: Int,
     val remSleepMinutes: Int,
+    val lightSleepMinutes: Int = 0,
+    val awakeMinutes: Int = 0,
     val sleepScore: Int?,
     val hrvMs: Double,
     val hrvRolling7DayAvg: Double,
@@ -17,5 +19,14 @@ data class HealthMetrics(
     val weight: Double?,
     val bodyFatPercentage: Double?,
     val dataSources: Map<String, String> = emptyMap(),
-    val metricDates: Map<String, String> = emptyMap()
+    val metricDates: Map<String, String> = emptyMap(),
+    val exerciseSessions: List<ExerciseSummaryDomain> = emptyList()
+)
+
+data class ExerciseSummaryDomain(
+    val type: String,
+    val title: String,
+    val durationMinutes: Int,
+    val startTime: String,
+    val notes: String? = null
 )

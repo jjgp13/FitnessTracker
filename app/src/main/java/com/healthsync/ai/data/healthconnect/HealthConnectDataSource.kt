@@ -7,6 +7,7 @@ import androidx.health.connect.client.records.BloodPressureRecord
 import androidx.health.connect.client.records.BodyFatRecord
 import androidx.health.connect.client.records.HeartRateRecord
 import androidx.health.connect.client.records.HeartRateVariabilityRmssdRecord
+import androidx.health.connect.client.records.ExerciseSessionRecord
 import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.records.WeightRecord
@@ -39,7 +40,8 @@ class HealthConnectDataSource @Inject constructor(
         HealthPermission.getReadPermission(WeightRecord::class),
         HealthPermission.getReadPermission(BodyFatRecord::class),
         HealthPermission.getReadPermission(BloodPressureRecord::class),
-        HealthPermission.getReadPermission(HeartRateVariabilityRmssdRecord::class)
+        HealthPermission.getReadPermission(HeartRateVariabilityRmssdRecord::class),
+        HealthPermission.getReadPermission(ExerciseSessionRecord::class)
     )
 
     suspend fun checkPermissions(): Boolean {
@@ -53,8 +55,9 @@ class HealthConnectDataSource @Inject constructor(
     suspend fun readSleepData(date: LocalDate): List<SleepSessionRecord> {
         val client = healthConnectClient ?: return emptyList()
         val zone = ZoneId.systemDefault()
-        val start = date.atStartOfDay(zone).toInstant()
-        val end = date.plusDays(1).atStartOfDay(zone).toInstant()
+        // "Last night" window: previous day 6pm to this day noon
+        val start = date.minusDays(1).atTime(18, 0).atZone(zone).toInstant()
+        val end = date.atTime(12, 0).atZone(zone).toInstant()
         val response = client.readRecords(
             ReadRecordsRequest(
                 recordType = SleepSessionRecord::class,
@@ -163,46 +166,14 @@ class HealthConnectDataSource @Inject constructor(
         return response.records
     }
 
-    suspend fun readSleepDataRange(startDate: LocalDate, endDate: LocalDate): List<SleepSessionRecord> {
+    suspend fun readExerciseSessions(date: LocalDate): List<ExerciseSessionRecord> {
         val client = healthConnectClient ?: return emptyList()
         val zone = ZoneId.systemDefault()
-        val start = startDate.atStartOfDay(zone).toInstant()
-        val end = endDate.plusDays(1).atStartOfDay(zone).toInstant()
+        val start = date.atStartOfDay(zone).toInstant()
+        val end = date.plusDays(1).atStartOfDay(zone).toInstant()
         val response = client.readRecords(
             ReadRecordsRequest(
-                recordType = SleepSessionRecord::class,
-                timeRangeFilter = TimeRangeFilter.between(start, end)
-            )
-        )
-        return response.records
-    }
-
-    suspend fun readHeartRateRange(startDate: LocalDate, endDate: LocalDate): Int? {
-        val client = healthConnectClient ?: return null
-        val zone = ZoneId.systemDefault()
-        val start = startDate.atStartOfDay(zone).toInstant()
-        val end = endDate.plusDays(1).atStartOfDay(zone).toInstant()
-        val response = client.readRecords(
-            ReadRecordsRequest(
-                recordType = HeartRateRecord::class,
-                timeRangeFilter = TimeRangeFilter.between(start, end)
-            )
-        )
-        val allSamples = response.records.flatMap { it.samples }
-        if (allSamples.isEmpty()) return null
-        val sorted = allSamples.map { it.beatsPerMinute }.sorted()
-        val count = maxOf(1, sorted.size / 10)
-        return sorted.take(count).average().toInt()
-    }
-
-    suspend fun readHrvDataRange(startDate: LocalDate, endDate: LocalDate): List<HeartRateVariabilityRmssdRecord> {
-        val client = healthConnectClient ?: return emptyList()
-        val zone = ZoneId.systemDefault()
-        val start = startDate.atStartOfDay(zone).toInstant()
-        val end = endDate.plusDays(1).atStartOfDay(zone).toInstant()
-        val response = client.readRecords(
-            ReadRecordsRequest(
-                recordType = HeartRateVariabilityRmssdRecord::class,
+                recordType = ExerciseSessionRecord::class,
                 timeRangeFilter = TimeRangeFilter.between(start, end)
             )
         )

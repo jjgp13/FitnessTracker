@@ -18,6 +18,9 @@ data class HealthMetricsEntity(
     val steps: Int,
     val weight: Double?,
     val bodyFatPercentage: Double?,
+    val lightSleepMinutes: Int = 0,
+    val awakeMinutes: Int = 0,
     val dataSources: String = "{}",
-    val metricDates: String = "{}"
+    val metricDates: String = "{}",
+    val exerciseSessionsJson: String = "[]"
 )

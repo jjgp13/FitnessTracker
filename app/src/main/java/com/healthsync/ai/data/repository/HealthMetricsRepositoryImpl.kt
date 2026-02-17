@@ -28,7 +28,8 @@ class HealthMetricsRepositoryImpl @Inject constructor(
         val yesterday = today.minusDays(1)
 
         // === SLEEP: Eight Sleep first, fallback to Health Connect (Fitbit) ===
-        var sleepDuration = 0; var deepSleep = 0; var remSleep = 0; var sleepScore: Int? = null
+        var sleepDuration = 0; var deepSleep = 0; var remSleep = 0
+        var lightSleep = 0; var awakeMins = 0; var sleepScore: Int? = null
         var hrvMs = 0.0; var restingHr = 0
 
         if (eightSleepDataSource.isAuthenticated()) {
@@ -42,9 +43,12 @@ class HealthMetricsRepositoryImpl @Inject constructor(
                     } catch (_: Exception) {}
                 }
                 session.stages.forEach { stage ->
+                    val mins = ((stage.duration ?: 0) / 60).toInt()
                     when (stage.stage?.lowercase()) {
-                        "deep" -> deepSleep += ((stage.duration ?: 0) / 60).toInt()
-                        "rem" -> remSleep += ((stage.duration ?: 0) / 60).toInt()
+                        "deep" -> deepSleep += mins
+                        "rem" -> remSleep += mins
+                        "light" -> lightSleep += mins
+                        "awake" -> awakeMins += mins
                     }
                 }
                 sleepScore = session.score
@@ -67,52 +71,46 @@ class HealthMetricsRepositoryImpl @Inject constructor(
             }
         }
 
-        // Fallback to Health Connect (Fitbit) for sleep — try today, then yesterday
+        // Fallback to Health Connect (Fitbit) for sleep
         if (sleepDuration == 0) {
-            var sleepSessions = healthConnectDataSource.readSleepData(today)
-            var sleepDate = today
-            if (sleepSessions.isEmpty()) {
-                sleepSessions = healthConnectDataSource.readSleepData(yesterday)
-                sleepDate = yesterday
-            }
+            // readSleepData now uses "last night" window (yesterday 6pm → today noon)
+            val sleepSessions = healthConnectDataSource.readSleepData(today)
             sleepDuration = HealthConnectMapper.mapSleepDuration(sleepSessions)
             deepSleep = HealthConnectMapper.mapDeepSleepMinutes(sleepSessions)
             remSleep = HealthConnectMapper.mapRemSleepMinutes(sleepSessions)
+            lightSleep = HealthConnectMapper.mapLightSleepMinutes(sleepSessions)
+            awakeMins = HealthConnectMapper.mapAwakeMinutes(sleepSessions)
             if (sleepDuration > 0) {
                 dataSources["sleep"] = "Fitbit"
-                metricDates["sleep"] = sleepDate.toString()
+                metricDates["sleep"] = today.toString()
             }
         }
 
-        // Fallback HR — try today, then last 3 days
+        // Fallback HR — query day-by-day going back up to 3 days
         if (restingHr == 0) {
-            restingHr = healthConnectDataSource.readHeartRate(today) ?: 0
-            if (restingHr > 0) {
-                dataSources["restingHr"] = "Fitbit"
-                metricDates["restingHr"] = today.toString()
-            } else {
-                val fallbackHr = healthConnectDataSource.readHeartRateRange(today.minusDays(3), yesterday)
-                if (fallbackHr != null && fallbackHr > 0) {
-                    restingHr = fallbackHr
+            for (daysBack in 0..2) {
+                val queryDate = today.minusDays(daysBack.toLong())
+                val hr = healthConnectDataSource.readHeartRate(queryDate)
+                if (hr != null && hr > 0) {
+                    restingHr = hr
                     dataSources["restingHr"] = "Fitbit"
-                    metricDates["restingHr"] = yesterday.toString()
+                    metricDates["restingHr"] = queryDate.toString()
+                    break
                 }
             }
         }
 
-        // Fallback HRV — try today, then last 3 days
+        // Fallback HRV — query day-by-day going back up to 3 days
         if (hrvMs == 0.0) {
-            val hrvRecords = healthConnectDataSource.readHrvData(today)
-            hrvMs = HealthConnectMapper.mapHrvAverage(hrvRecords)
-            if (hrvMs > 0) {
-                dataSources["hrv"] = "Fitbit"
-                metricDates["hrv"] = today.toString()
-            } else {
-                val fallbackHrv = healthConnectDataSource.readHrvDataRange(today.minusDays(3), yesterday)
-                hrvMs = HealthConnectMapper.mapHrvAverage(fallbackHrv)
-                if (hrvMs > 0) {
+            for (daysBack in 0..2) {
+                val queryDate = today.minusDays(daysBack.toLong())
+                val hrvRecords = healthConnectDataSource.readHrvData(queryDate)
+                val avg = HealthConnectMapper.mapHrvAverage(hrvRecords)
+                if (avg > 0) {
+                    hrvMs = avg
                     dataSources["hrv"] = "Fitbit"
-                    metricDates["hrv"] = yesterday.toString()
+                    metricDates["hrv"] = queryDate.toString()
+                    break
                 }
             }
         }
@@ -124,7 +122,15 @@ class HealthMetricsRepositoryImpl @Inject constructor(
             metricDates["steps"] = yesterday.toString()
         }
 
-        // Weight: from Health Connect (Withings) — already looks back 90 days
+        // EXERCISE: Yesterday's sessions from Health Connect (Fitbit)
+        val exerciseRecords = healthConnectDataSource.readExerciseSessions(yesterday)
+        val exerciseSessions = HealthConnectMapper.mapExerciseSessions(exerciseRecords)
+        if (exerciseSessions.isNotEmpty()) {
+            dataSources["exercise"] = "Fitbit"
+            metricDates["exercise"] = yesterday.toString()
+        }
+
+        // Weight: from Health Connect (Withings)
         val weightResult = healthConnectDataSource.readWeight()
         val weight = weightResult?.first
         if (weightResult != null) {
@@ -161,6 +167,8 @@ class HealthMetricsRepositoryImpl @Inject constructor(
             sleepDurationMinutes = sleepDuration,
             deepSleepMinutes = deepSleep,
             remSleepMinutes = remSleep,
+            lightSleepMinutes = lightSleep,
+            awakeMinutes = awakeMins,
             sleepScore = sleepScore,
             hrvMs = hrvMs,
             hrvRolling7DayAvg = hrvRolling7DayAvg,
@@ -171,7 +179,14 @@ class HealthMetricsRepositoryImpl @Inject constructor(
             weight = weight,
             bodyFatPercentage = bodyFat,
             dataSources = dataSources,
-            metricDates = metricDates
+            metricDates = metricDates,
+            exerciseSessions = exerciseSessions.map {
+                com.healthsync.ai.domain.model.ExerciseSummaryDomain(
+                    type = it.type, title = it.title,
+                    durationMinutes = it.durationMinutes,
+                    startTime = it.startTime, notes = it.notes
+                )
+            }
         )
 
         healthMetricsDao.insert(metrics.toEntity())

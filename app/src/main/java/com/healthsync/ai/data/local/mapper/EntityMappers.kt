@@ -4,6 +4,7 @@ import com.healthsync.ai.data.local.db.entity.DailyPlanEntity
 import com.healthsync.ai.data.local.db.entity.HealthMetricsEntity
 import com.healthsync.ai.data.local.db.entity.UserProfileEntity
 import com.healthsync.ai.domain.model.DailyPlan
+import com.healthsync.ai.domain.model.ExerciseSummaryDomain
 import com.healthsync.ai.domain.model.HealthMetrics
 import com.healthsync.ai.domain.model.Macros
 import com.healthsync.ai.domain.model.NutritionPlan
@@ -19,11 +20,28 @@ import java.time.LocalDate
 private val json = Json { ignoreUnknownKeys = true }
 private val stringListSerializer = ListSerializer(String.serializer())
 
+@kotlinx.serialization.Serializable
+private data class ExerciseSummarySerializable(
+    val type: String,
+    val title: String,
+    val durationMinutes: Int,
+    val startTime: String,
+    val notes: String? = null
+) {
+    fun toDomain() = ExerciseSummaryDomain(type, title, durationMinutes, startTime, notes)
+    companion object {
+        fun fromDomain(e: ExerciseSummaryDomain) =
+            ExerciseSummarySerializable(e.type, e.title, e.durationMinutes, e.startTime, e.notes)
+    }
+}
+
 fun HealthMetricsEntity.toDomain(): HealthMetrics = HealthMetrics(
     date = LocalDate.parse(date),
     sleepDurationMinutes = sleepDurationMinutes,
     deepSleepMinutes = deepSleepMinutes,
     remSleepMinutes = remSleepMinutes,
+    lightSleepMinutes = lightSleepMinutes,
+    awakeMinutes = awakeMinutes,
     sleepScore = sleepScore,
     hrvMs = hrvMs,
     hrvRolling7DayAvg = hrvRolling7DayAvg,
@@ -34,7 +52,10 @@ fun HealthMetricsEntity.toDomain(): HealthMetrics = HealthMetrics(
     weight = weight,
     bodyFatPercentage = bodyFatPercentage,
     dataSources = json.decodeFromString<Map<String, String>>(dataSources),
-    metricDates = json.decodeFromString<Map<String, String>>(metricDates)
+    metricDates = json.decodeFromString<Map<String, String>>(metricDates),
+    exerciseSessions = try {
+        json.decodeFromString<List<ExerciseSummarySerializable>>(exerciseSessionsJson).map { it.toDomain() }
+    } catch (_: Exception) { emptyList() }
 )
 
 fun HealthMetrics.toEntity(): HealthMetricsEntity = HealthMetricsEntity(
@@ -42,6 +63,8 @@ fun HealthMetrics.toEntity(): HealthMetricsEntity = HealthMetricsEntity(
     sleepDurationMinutes = sleepDurationMinutes,
     deepSleepMinutes = deepSleepMinutes,
     remSleepMinutes = remSleepMinutes,
+    lightSleepMinutes = lightSleepMinutes,
+    awakeMinutes = awakeMinutes,
     sleepScore = sleepScore,
     hrvMs = hrvMs,
     hrvRolling7DayAvg = hrvRolling7DayAvg,
@@ -52,7 +75,8 @@ fun HealthMetrics.toEntity(): HealthMetricsEntity = HealthMetricsEntity(
     weight = weight,
     bodyFatPercentage = bodyFatPercentage,
     dataSources = json.encodeToString(dataSources),
-    metricDates = json.encodeToString(metricDates)
+    metricDates = json.encodeToString(metricDates),
+    exerciseSessionsJson = json.encodeToString(exerciseSessions.map { ExerciseSummarySerializable.fromDomain(it) })
 )
 
 fun UserProfileEntity.toDomain(): UserProfile = UserProfile(

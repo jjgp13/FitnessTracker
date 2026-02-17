@@ -59,7 +59,7 @@ object PromptBuilder {
             appendLine("Today is $dayOfWeek, $dateStr.")
             appendLine()
             appendLine("## Today's Health Metrics")
-            appendLine("- Sleep: ${sleepHours}h ${sleepMins}m total (Deep: ${metrics.deepSleepMinutes}m, REM: ${metrics.remSleepMinutes}m)")
+            appendLine("- Sleep: ${sleepHours}h ${sleepMins}m total (Deep: ${metrics.deepSleepMinutes}m, REM: ${metrics.remSleepMinutes}m, Light: ${metrics.lightSleepMinutes}m, Awake: ${metrics.awakeMinutes}m)")
             metrics.sleepScore?.let { appendLine("- Sleep Score: $it/100") }
             appendLine("- HRV: ${metrics.hrvMs}ms (7-day avg: ${metrics.hrvRolling7DayAvg}ms)")
             appendLine("- Resting Heart Rate: ${metrics.restingHeartRate} bpm")
@@ -67,6 +67,13 @@ object PromptBuilder {
                 appendLine("- Blood Pressure: ${metrics.bloodPressureSystolic}/${metrics.bloodPressureDiastolic} mmHg")
             }
             appendLine("- Steps: ${metrics.steps}")
+            if (metrics.exerciseSessions.isNotEmpty()) {
+                appendLine()
+                appendLine("## Yesterday's Exercise Sessions")
+                metrics.exerciseSessions.forEach { exercise ->
+                    appendLine("- ${exercise.title}: ${exercise.durationMinutes} min${if (exercise.notes != null) " (${exercise.notes})" else ""}")
+                }
+            }
             metrics.weight?.let { appendLine("- Weight: $it lbs") }
             metrics.bodyFatPercentage?.let { appendLine("- Body Fat: $it%") }
             appendLine()

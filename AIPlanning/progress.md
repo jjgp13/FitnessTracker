@@ -154,6 +154,24 @@
 
 ---
 
+### Bug Fixes: Sleep/HR/HRV Data + Exercise Sessions ✅
+**Commit**: (pending)
+**Date**: 2026-02-17
+
+**Bugs fixed:**
+- **Sleep 34.9 hrs**: Caused by midnight-to-midnight query capturing overlapping sessions + summing all. Fixed: "last night" window (6pm→noon), take only the longest single session.
+- **HR showing weekly average**: Range-based fallback aggregated 3 days of samples. Fixed: query day-by-day starting from today, stop at first day with data.
+- **HRV same issue**: Same fix — day-by-day query instead of range.
+
+**Features added:**
+- **Sleep stages**: Added light sleep and awake minutes from both Eight Sleep and Fitbit. Gemini prompt now includes full breakdown (Deep, REM, Light, Awake).
+- **Exercise sessions**: Reads `ExerciseSessionRecord` from Health Connect for yesterday. Maps exercise type (Running, Soccer, Volleyball, HIIT, etc.). Shows in UI as "Yesterday's Activity" cards. Included in Gemini prompt for training context.
+- **Health Connect permissions**: Added `READ_EXERCISE` permission.
+
+**Files modified**: 11 files (HealthConnectDataSource, HealthConnectMapper, HealthMetrics, HealthMetricsEntity, EntityMappers, HealthSyncDatabase, HealthMetricsRepositoryImpl, AndroidManifest, PromptBuilder, MorningBriefingScreen)
+
+---
+
 ## Remaining Phases
 
 ### Phase 3: Health Data Integration ✅ COMPLETE
