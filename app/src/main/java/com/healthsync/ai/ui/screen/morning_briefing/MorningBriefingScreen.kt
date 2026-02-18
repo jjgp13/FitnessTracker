@@ -16,12 +16,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bedtime
-import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.MonitorHeart
+import androidx.compose.material.icons.filled.NightsStay
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -176,53 +177,6 @@ private fun MorningBriefingContent(
                 }
             }
 
-            // Exercise Sessions (Yesterday)
-            if (metrics.exerciseSessions.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Yesterday's Activity",
-                    style = MaterialTheme.typography.titleMedium
-                )
-                metrics.exerciseSessions.forEach { exercise ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.FitnessCenter,
-                                contentDescription = exercise.title,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(28.dp)
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = exercise.title,
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-                                exercise.notes?.let {
-                                    Text(
-                                        text = it,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                            Text(
-                                text = "${exercise.durationMinutes} min",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-                }
-            }
         }
 
         // Workout Card
@@ -361,6 +315,21 @@ private fun buildMetricItems(metrics: HealthMetrics): List<MetricItem> {
         return if (dateLabel.isNotEmpty()) "$source · $dateLabel" else source
     }
 
+    // HRV — gold standard for readiness
+    val hrvStatus = when {
+        metrics.hrvMs >= metrics.hrvRolling7DayAvg * 0.95 -> MetricStatus.GOOD
+        metrics.hrvMs >= metrics.hrvRolling7DayAvg * 0.90 -> MetricStatus.WARNING
+        else -> MetricStatus.ALERT
+    }
+
+    // Resting HR — elevated RHR signals fatigue/dehydration
+    val hrStatus = when {
+        metrics.restingHeartRate <= 60 -> MetricStatus.GOOD
+        metrics.restingHeartRate <= 75 -> MetricStatus.WARNING
+        else -> MetricStatus.ALERT
+    }
+
+    // Sleep duration
     val sleepHours = metrics.sleepDurationMinutes / 60.0
     val sleepStatus = when {
         sleepHours >= 7.0 -> MetricStatus.GOOD
@@ -368,27 +337,41 @@ private fun buildMetricItems(metrics: HealthMetrics): List<MetricItem> {
         else -> MetricStatus.ALERT
     }
 
-    val hrvStatus = when {
-        metrics.hrvMs >= metrics.hrvRolling7DayAvg * 0.95 -> MetricStatus.GOOD
-        metrics.hrvMs >= metrics.hrvRolling7DayAvg * 0.90 -> MetricStatus.WARNING
+    // Sleep debt — hours below 8h target; 2+ hours means avoid high-intensity
+    val sleepDebt = maxOf(0.0, 8.0 - sleepHours)
+    val sleepDebtStatus = when {
+        sleepDebt <= 0.5 -> MetricStatus.GOOD
+        sleepDebt <= 2.0 -> MetricStatus.WARNING
         else -> MetricStatus.ALERT
     }
 
-    val hrStatus = when {
-        metrics.restingHeartRate <= 60 -> MetricStatus.GOOD
-        metrics.restingHeartRate <= 75 -> MetricStatus.WARNING
+    // Deep sleep — <60 min means skip heavy strength, focus on technical work
+    val deepSleepStatus = when {
+        metrics.deepSleepMinutes >= 60 -> MetricStatus.GOOD
+        metrics.deepSleepMinutes >= 45 -> MetricStatus.WARNING
         else -> MetricStatus.ALERT
     }
 
     val items = mutableListOf(
-        MetricItem(Icons.Default.Bedtime, "Sleep", "%.1f".format(sleepHours), "hrs", formatSourceDate("sleep"), sleepStatus),
         MetricItem(Icons.Default.MonitorHeart, "HRV", "%.0f".format(metrics.hrvMs), "ms", formatSourceDate("hrv"), hrvStatus),
         MetricItem(Icons.Default.Favorite, "Resting HR", "${metrics.restingHeartRate}", "bpm", formatSourceDate("restingHr"), hrStatus),
-        MetricItem(Icons.AutoMirrored.Filled.DirectionsWalk, "Steps (Yesterday)", "%,d".format(metrics.steps), null, formatSourceDate("steps"), MetricStatus.GOOD)
+        MetricItem(Icons.Default.Bedtime, "Sleep", "%.1f".format(sleepHours), "hrs", formatSourceDate("sleep"), sleepStatus),
+        MetricItem(Icons.Default.Warning, "Sleep Debt", "%.1f".format(sleepDebt), "hrs", null, sleepDebtStatus),
+        MetricItem(Icons.Default.NightsStay, "Deep Sleep", "${metrics.deepSleepMinutes}", "min", formatSourceDate("sleep"), deepSleepStatus)
     )
 
+    // Sleep score from Eight Sleep (quality indicator)
+    metrics.sleepScore?.let { score ->
+        val scoreStatus = when {
+            score >= 80 -> MetricStatus.GOOD
+            score >= 60 -> MetricStatus.WARNING
+            else -> MetricStatus.ALERT
+        }
+        items.add(5, MetricItem(Icons.Default.Star, "Sleep Score", "$score", "/100", formatSourceDate("sleep"), scoreStatus))
+    }
+
     metrics.weight?.let {
-        items.add(MetricItem(Icons.Default.FitnessCenter, "Weight", "%.1f".format(it), "kg", formatSourceDate("weight"), MetricStatus.GOOD))
+        items.add(MetricItem(Icons.Default.Person, "Weight", "%.1f".format(it), "kg", formatSourceDate("weight"), MetricStatus.GOOD))
     }
     metrics.bodyFatPercentage?.let {
         items.add(MetricItem(Icons.Default.Person, "Body Fat", "%.1f".format(it), "%", formatSourceDate("bodyFat"), MetricStatus.GOOD))

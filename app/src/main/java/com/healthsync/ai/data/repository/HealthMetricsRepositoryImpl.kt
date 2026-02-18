@@ -115,21 +115,6 @@ class HealthMetricsRepositoryImpl @Inject constructor(
             }
         }
 
-        // STEPS: Yesterday's data from Health Connect (Fitbit)
-        val steps = healthConnectDataSource.readSteps(yesterday)
-        if (steps > 0) {
-            dataSources["steps"] = "Fitbit"
-            metricDates["steps"] = yesterday.toString()
-        }
-
-        // EXERCISE: Yesterday's sessions from Health Connect (Fitbit)
-        val exerciseRecords = healthConnectDataSource.readExerciseSessions(yesterday)
-        val exerciseSessions = HealthConnectMapper.mapExerciseSessions(exerciseRecords)
-        if (exerciseSessions.isNotEmpty()) {
-            dataSources["exercise"] = "Fitbit"
-            metricDates["exercise"] = yesterday.toString()
-        }
-
         // Weight: from Health Connect (Withings)
         val weightResult = healthConnectDataSource.readWeight()
         val weight = weightResult?.first
@@ -175,18 +160,12 @@ class HealthMetricsRepositoryImpl @Inject constructor(
             restingHeartRate = restingHr,
             bloodPressureSystolic = bpSystolic,
             bloodPressureDiastolic = bpDiastolic,
-            steps = steps,
+            steps = 0,
             weight = weight,
             bodyFatPercentage = bodyFat,
             dataSources = dataSources,
             metricDates = metricDates,
-            exerciseSessions = exerciseSessions.map {
-                com.healthsync.ai.domain.model.ExerciseSummaryDomain(
-                    type = it.type, title = it.title,
-                    durationMinutes = it.durationMinutes,
-                    startTime = it.startTime, notes = it.notes
-                )
-            }
+            exerciseSessions = emptyList()
         )
 
         healthMetricsDao.insert(metrics.toEntity())

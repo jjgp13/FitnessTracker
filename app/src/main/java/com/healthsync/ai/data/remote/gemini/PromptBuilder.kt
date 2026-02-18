@@ -22,10 +22,14 @@ object PromptBuilder {
         appendLine("- Default macro split: ${profile.macroSplit.carbsPercent}% Carbs, ${profile.macroSplit.proteinPercent}% Protein, ${profile.macroSplit.fatPercent}% Fat")
         appendLine()
         appendLine("Your responsibilities:")
-        appendLine("1. ANALYZE: Evaluate Sleep Quality (Deep/REM), HRV, and Blood Pressure data")
-        appendLine("2. TRAIN: Generate workouts focusing on explosive power and sport-specific training")
-        appendLine("3. FUEL: Recommend 3 meals and 2 snacks matching the macro split")
-        appendLine("4. FORMAT: Always return a valid JSON object matching the DailyPlan schema")
+        appendLine("1. ANALYZE: Evaluate HRV (relative to 7-day baseline), Resting Heart Rate, Sleep Quality/Debt, and Deep Sleep Duration")
+        appendLine("2. If HRV is low relative to baseline: athlete's nervous system is stressed, recommend lower-intensity recovery")
+        appendLine("3. If Resting HR is 5-10 bpm above average: systemic fatigue, dehydration, or illness risk")
+        appendLine("4. If Sleep Debt exceeds 2 hours: avoid high-intensity speed drills (reaction time and injury risk increase)")
+        appendLine("5. If Deep Sleep is under 60 minutes: skip heavy strength training, focus on technical skills (growth hormone release impaired)")
+        appendLine("6. TRAIN: Generate workouts focusing on explosive power and sport-specific training")
+        appendLine("7. FUEL: Recommend 3 meals and 2 snacks matching the macro split")
+        appendLine("8. FORMAT: Always return a valid JSON object matching the DailyPlan schema")
         appendLine()
         appendLine("Schedule awareness rules:")
         appendLine("- If today is a GAME DAY: Plan pre-game nutrition (carb-loading), light activation workout")
@@ -54,25 +58,19 @@ object PromptBuilder {
 
         val sleepHours = metrics.sleepDurationMinutes / 60
         val sleepMins = metrics.sleepDurationMinutes % 60
+        val sleepDebtHours = maxOf(0.0, 8.0 - metrics.sleepDurationMinutes / 60.0)
 
         return buildString {
             appendLine("Today is $dayOfWeek, $dateStr.")
             appendLine()
-            appendLine("## Today's Health Metrics")
-            appendLine("- Sleep: ${sleepHours}h ${sleepMins}m total (Deep: ${metrics.deepSleepMinutes}m, REM: ${metrics.remSleepMinutes}m, Light: ${metrics.lightSleepMinutes}m, Awake: ${metrics.awakeMinutes}m)")
-            metrics.sleepScore?.let { appendLine("- Sleep Score: $it/100") }
+            appendLine("## Today's Readiness Metrics")
             appendLine("- HRV: ${metrics.hrvMs}ms (7-day avg: ${metrics.hrvRolling7DayAvg}ms)")
             appendLine("- Resting Heart Rate: ${metrics.restingHeartRate} bpm")
+            appendLine("- Sleep: ${sleepHours}h ${sleepMins}m total (Deep: ${metrics.deepSleepMinutes}m, REM: ${metrics.remSleepMinutes}m, Light: ${metrics.lightSleepMinutes}m, Awake: ${metrics.awakeMinutes}m)")
+            appendLine("- Sleep Debt: ${"%.1f".format(sleepDebtHours)}h below 8h target")
+            metrics.sleepScore?.let { appendLine("- Sleep Score: $it/100") }
             if (metrics.bloodPressureSystolic != null && metrics.bloodPressureDiastolic != null) {
                 appendLine("- Blood Pressure: ${metrics.bloodPressureSystolic}/${metrics.bloodPressureDiastolic} mmHg")
-            }
-            appendLine("- Steps: ${metrics.steps}")
-            if (metrics.exerciseSessions.isNotEmpty()) {
-                appendLine()
-                appendLine("## Yesterday's Exercise Sessions")
-                metrics.exerciseSessions.forEach { exercise ->
-                    appendLine("- ${exercise.title}: ${exercise.durationMinutes} min${if (exercise.notes != null) " (${exercise.notes})" else ""}")
-                }
             }
             metrics.weight?.let { appendLine("- Weight: $it lbs") }
             metrics.bodyFatPercentage?.let { appendLine("- Body Fat: $it%") }
