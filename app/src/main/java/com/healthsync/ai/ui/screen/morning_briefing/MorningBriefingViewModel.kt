@@ -3,14 +3,12 @@ package com.healthsync.ai.ui.screen.morning_briefing
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.healthsync.ai.data.healthconnect.HealthConnectDataSource
-import com.healthsync.ai.domain.model.DailyPlan
 import com.healthsync.ai.domain.model.HealthMetrics
 import com.healthsync.ai.domain.model.RecoveryStatus
 import com.healthsync.ai.domain.model.WeekSchedule
 import com.healthsync.ai.domain.repository.UserProfileRepository
 import com.healthsync.ai.domain.usecase.DetermineRecoveryStatusUseCase
 import com.healthsync.ai.domain.usecase.FetchMorningMetricsUseCase
-import com.healthsync.ai.domain.usecase.GenerateDailyPlanUseCase
 import com.healthsync.ai.domain.usecase.GetWeekScheduleUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,11 +24,11 @@ import javax.inject.Inject
 
 data class MorningBriefingUiState(
     val isLoading: Boolean = true,
+    val isSyncing: Boolean = false,
+    val isSynced: Boolean = false,
     val errorMessage: String? = null,
-    val aiWarning: String? = null,
     val healthMetrics: HealthMetrics? = null,
     val recoveryStatus: RecoveryStatus? = null,
-    val dailyPlan: DailyPlan? = null,
     val weekSchedule: WeekSchedule? = null,
     val userName: String? = null,
     val needsHealthPermissions: Boolean = false
@@ -40,7 +38,6 @@ data class MorningBriefingUiState(
 class MorningBriefingViewModel @Inject constructor(
     private val fetchMorningMetricsUseCase: FetchMorningMetricsUseCase,
     private val determineRecoveryStatusUseCase: DetermineRecoveryStatusUseCase,
-    private val generateDailyPlanUseCase: GenerateDailyPlanUseCase,
     private val getWeekScheduleUseCase: GetWeekScheduleUseCase,
     private val userProfileRepository: UserProfileRepository,
     val healthConnectDataSource: HealthConnectDataSource
@@ -50,85 +47,70 @@ class MorningBriefingViewModel @Inject constructor(
     val uiState: StateFlow<MorningBriefingUiState> = _uiState.asStateFlow()
 
     init {
-        checkPermissionsAndLoad()
-    }
-
-    fun refresh() {
-        loadAll()
+        loadInitial()
     }
 
     fun onPermissionsResult(granted: Boolean) {
         if (granted) {
-            _uiState.update { it.copy(needsHealthPermissions = false) }
-            loadAll()
+            _uiState.update { it.copy(needsHealthPermissions = false, isLoading = false) }
         } else {
             _uiState.update {
                 it.copy(
                     needsHealthPermissions = true,
                     isLoading = false,
-                    errorMessage = "Health Connect permissions are required to show your metrics. Please grant them and tap Retry."
+                    errorMessage = "Health Connect permissions are required. Please grant them and tap Retry."
                 )
             }
         }
     }
 
-    private fun checkPermissionsAndLoad() {
+    fun syncHealthConnect() {
         viewModelScope.launch {
-            val hasPermissions = healthConnectDataSource.checkPermissions()
-            if (hasPermissions) {
-                loadAll()
-            } else {
-                _uiState.update { it.copy(needsHealthPermissions = true, isLoading = false) }
+            _uiState.update { it.copy(isSyncing = true, errorMessage = null) }
+            try {
+                val metricsResult = fetchMorningMetricsUseCase()
+                val metrics = metricsResult.getOrThrow()
+                val recovery = determineRecoveryStatusUseCase(metrics)
+                _uiState.update {
+                    it.copy(
+                        isSyncing = false,
+                        isSynced = true,
+                        healthMetrics = metrics,
+                        recoveryStatus = recovery
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isSyncing = false,
+                        errorMessage = "Sync failed: ${e.message}"
+                    )
+                }
             }
         }
     }
 
-    private fun loadAll() {
+    private fun loadInitial() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, errorMessage = null, aiWarning = null) }
-
             try {
-                // Load user name
+                val hasPermissions = healthConnectDataSource.checkPermissions()
+                if (!hasPermissions) {
+                    _uiState.update { it.copy(needsHealthPermissions = true, isLoading = false) }
+                    return@launch
+                }
+
                 val profile = userProfileRepository.getUserProfile().firstOrNull()
                 _uiState.update { it.copy(userName = profile?.displayName) }
 
-                // Fetch metrics
-                val metricsResult = fetchMorningMetricsUseCase()
-                val metrics = metricsResult.getOrThrow()
-                _uiState.update { it.copy(healthMetrics = metrics) }
-
-                // Determine recovery
-                val recovery = determineRecoveryStatusUseCase(metrics)
-                _uiState.update { it.copy(recoveryStatus = recovery) }
-
-                // Get week schedule
                 val today = LocalDate.now()
                 val weekStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
                 val schedule = getWeekScheduleUseCase(weekStart)
-                _uiState.update { it.copy(weekSchedule = schedule) }
-
-                // Generate daily plan (non-blocking — show metrics even if AI fails)
-                val planResult = generateDailyPlanUseCase(today)
-                planResult.onSuccess { plan ->
-                    _uiState.update { it.copy(dailyPlan = plan) }
-                }.onFailure { e ->
-                    val msg = when {
-                        e.message?.contains("quota", ignoreCase = true) == true ||
-                        e.message?.contains("429", ignoreCase = true) == true ||
-                        e.message?.contains("RESOURCE_EXHAUSTED", ignoreCase = true) == true ->
-                            "Gemini API quota exceeded. Your health metrics are shown below. AI plan will retry later."
-                        else ->
-                            "AI plan unavailable: ${e.message}"
-                    }
-                    _uiState.update { it.copy(aiWarning = msg) }
-                }
-
-                _uiState.update { it.copy(isLoading = false) }
+                _uiState.update { it.copy(weekSchedule = schedule, isLoading = false) }
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        errorMessage = e.message ?: "An unexpected error occurred"
+                        errorMessage = e.message ?: "Failed to load"
                     )
                 }
             }

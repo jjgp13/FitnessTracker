@@ -24,6 +24,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.healthsync.ai.ui.screen.auth.AuthScreen
+import com.healthsync.ai.ui.screen.daily_plan.DailyPlanScreen
 import com.healthsync.ai.ui.screen.morning_briefing.MorningBriefingScreen
 import com.healthsync.ai.ui.screen.nutrition.NutritionScreen
 import com.healthsync.ai.ui.screen.onboarding.OnboardingScreen
@@ -106,6 +107,14 @@ fun NavGraph() {
             }
             composable(Screen.MorningBriefing.route) {
                 MorningBriefingScreen(
+                    onNavigateToDailyPlan = {
+                        navController.navigate(Screen.DailyPlan.route)
+                    }
+                )
+            }
+            composable(Screen.DailyPlan.route) {
+                DailyPlanScreen(
+                    onNavigateBack = { navController.popBackStack() },
                     onNavigateToWorkout = {
                         navController.navigate(Screen.WorkoutDetail.route)
                     },

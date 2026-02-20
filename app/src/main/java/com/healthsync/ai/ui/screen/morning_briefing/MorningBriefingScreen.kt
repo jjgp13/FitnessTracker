@@ -1,7 +1,6 @@
 package com.healthsync.ai.ui.screen.morning_briefing
 
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,17 +14,22 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bedtime
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.MonitorHeart
 import androidx.compose.material.icons.filled.NightsStay
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -39,13 +43,11 @@ import androidx.health.connect.client.PermissionController
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.healthsync.ai.domain.model.HealthMetrics
-import com.healthsync.ai.ui.components.DayContext
 import com.healthsync.ai.ui.components.LoadingIndicator
 import com.healthsync.ai.ui.components.MetricCard
 import com.healthsync.ai.ui.components.MetricStatus
 import com.healthsync.ai.ui.components.RecoveryBanner
 import com.healthsync.ai.ui.components.ScheduleCard
-import com.healthsync.ai.ui.components.WorkoutCard
 import com.healthsync.ai.ui.components.determineDayContext
 import java.time.LocalDate
 import java.time.ZoneId
@@ -53,13 +55,11 @@ import java.time.format.DateTimeFormatter
 
 @Composable
 fun MorningBriefingScreen(
-    onNavigateToWorkout: () -> Unit = {},
-    onNavigateToNutrition: () -> Unit = {},
+    onNavigateToDailyPlan: () -> Unit = {},
     viewModel: MorningBriefingViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    // Health Connect permission launcher
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = PermissionController.createRequestPermissionResultContract()
     ) { grantedPermissions ->
@@ -67,7 +67,6 @@ fun MorningBriefingScreen(
         viewModel.onPermissionsResult(allGranted)
     }
 
-    // Automatically launch permission request when needed
     LaunchedEffect(uiState.needsHealthPermissions) {
         if (uiState.needsHealthPermissions) {
             permissionLauncher.launch(viewModel.healthConnectDataSource.permissions)
@@ -76,16 +75,14 @@ fun MorningBriefingScreen(
 
     when {
         uiState.isLoading -> {
-            LoadingIndicator(message = "Preparing your morning briefing...")
+            LoadingIndicator(message = "Loading...")
         }
-        uiState.errorMessage != null -> {
+        uiState.errorMessage != null && !uiState.isSynced -> {
             ErrorState(
                 message = uiState.errorMessage!!,
                 onRetry = {
                     if (uiState.needsHealthPermissions) {
                         permissionLauncher.launch(viewModel.healthConnectDataSource.permissions)
-                    } else {
-                        viewModel.refresh()
                     }
                 }
             )
@@ -93,8 +90,8 @@ fun MorningBriefingScreen(
         else -> {
             MorningBriefingContent(
                 uiState = uiState,
-                onNavigateToWorkout = onNavigateToWorkout,
-                onNavigateToNutrition = onNavigateToNutrition
+                onSyncClick = { viewModel.syncHealthConnect() },
+                onGeneratePlanClick = onNavigateToDailyPlan
             )
         }
     }
@@ -103,8 +100,8 @@ fun MorningBriefingScreen(
 @Composable
 private fun MorningBriefingContent(
     uiState: MorningBriefingUiState,
-    onNavigateToWorkout: () -> Unit,
-    onNavigateToNutrition: () -> Unit
+    onSyncClick: () -> Unit,
+    onGeneratePlanClick: () -> Unit
 ) {
     val today = LocalDate.now()
     val dateStr = today.format(DateTimeFormatter.ofPattern("EEEE, MMMM d"))
@@ -127,28 +124,6 @@ private fun MorningBriefingContent(
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
-        // AI Warning Banner (quota exceeded, etc.)
-        uiState.aiWarning?.let { warning ->
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.tertiaryContainer
-                )
-            ) {
-                Text(
-                    text = warning,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onTertiaryContainer,
-                    modifier = Modifier.padding(12.dp)
-                )
-            }
-        }
-
-        // Recovery Banner
-        uiState.recoveryStatus?.let { status ->
-            RecoveryBanner(recoveryStatus = status)
-        }
-
         // Schedule Card
         uiState.weekSchedule?.let { schedule ->
             val dayContext = determineDayContext(today, schedule.gameDays)
@@ -158,101 +133,92 @@ private fun MorningBriefingContent(
             ScheduleCard(dayContext = dayContext, todayEvents = todayEvents)
         }
 
-        // Health Metrics
-        uiState.healthMetrics?.let { metrics ->
-            Text(
-                text = "Health Metrics",
-                style = MaterialTheme.typography.titleMedium
-            )
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                buildMetricItems(metrics).forEach { item ->
-                    MetricCard(
-                        icon = item.icon,
-                        label = item.label,
-                        value = item.value,
-                        unit = item.unit,
-                        sourceInfo = item.sourceInfo,
-                        status = item.status
+        // Sync Health Connect Button
+        Button(
+            onClick = onSyncClick,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !uiState.isSyncing && !uiState.isSynced,
+            colors = if (uiState.isSynced)
+                ButtonDefaults.buttonColors(
+                    disabledContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    disabledContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            else ButtonDefaults.buttonColors()
+        ) {
+            when {
+                uiState.isSyncing -> {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary
                     )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Syncing…")
+                }
+                uiState.isSynced -> {
+                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Synced")
+                }
+                else -> {
+                    Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Sync Health Connect")
                 }
             }
-
         }
 
-        // Workout Card
-        uiState.dailyPlan?.let { plan ->
-            Text(
-                text = "Today's Workout",
-                style = MaterialTheme.typography.titleMedium
-            )
-            WorkoutCard(
-                workout = plan.workout,
-                onClick = onNavigateToWorkout
-            )
-        }
-
-        // Nutrition Summary
-        uiState.dailyPlan?.let { plan ->
-            Text(
-                text = "Nutrition",
-                style = MaterialTheme.typography.titleMedium
-            )
+        // Sync error
+        uiState.errorMessage?.let { error ->
             Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onNavigateToNutrition),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "${plan.nutritionPlan.targetCalories} kcal target",
-                        style = MaterialTheme.typography.titleSmall
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = "Carbs ${plan.nutritionPlan.macros.carbsPercent}%",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                        Text(
-                            text = "Protein ${plan.nutritionPlan.macros.proteinPercent}%",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                        Text(
-                            text = "Fat ${plan.nutritionPlan.macros.fatPercent}%",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "${plan.nutritionPlan.meals.size} meals · ${plan.nutritionPlan.snacks.size} snacks",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                Text(
+                    text = error,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    modifier = Modifier.padding(12.dp)
+                )
             }
         }
 
-        // Coach Notes
-        uiState.dailyPlan?.let { plan ->
-            if (plan.coachNotes.isNotBlank()) {
+        // After sync: Recovery Banner + Health Metrics
+        if (uiState.isSynced) {
+            uiState.recoveryStatus?.let { status ->
+                RecoveryBanner(recoveryStatus = status)
+            }
+
+            uiState.healthMetrics?.let { metrics ->
                 Text(
-                    text = "Coach Notes",
+                    text = "Health Metrics",
                     style = MaterialTheme.typography.titleMedium
                 )
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-                ) {
-                    Text(
-                        text = plan.coachNotes,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(16.dp)
-                    )
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    buildMetricItems(metrics).forEach { item ->
+                        MetricCard(
+                            icon = item.icon,
+                            label = item.label,
+                            value = item.value,
+                            unit = item.unit,
+                            sourceInfo = item.sourceInfo,
+                            status = item.status
+                        )
+                    }
                 }
+            }
+
+            // Generate AI Plan Button
+            Button(
+                onClick = onGeneratePlanClick,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondary
+                )
+            ) {
+                Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Generate AI Plan")
             }
         }
 
