@@ -67,7 +67,7 @@ class HealthConnectDataSource @Inject constructor(
         return response.records
     }
 
-    suspend fun readHeartRate(date: LocalDate): Int? {
+    suspend fun readHeartRate(date: LocalDate): Pair<Int, String>? {
         val client = healthConnectClient ?: return null
         val zone = ZoneId.systemDefault()
         val start = date.atStartOfDay(zone).toInstant()
@@ -83,7 +83,8 @@ class HealthConnectDataSource @Inject constructor(
         // Resting HR approximated as the lowest 10% average
         val sorted = allSamples.map { it.beatsPerMinute }.sorted()
         val count = maxOf(1, sorted.size / 10)
-        return sorted.take(count).average().toInt()
+        val sourcePackage = response.records.firstOrNull()?.metadata?.dataOrigin?.packageName ?: ""
+        return Pair(sorted.take(count).average().toInt(), sourcePackage)
     }
 
     suspend fun readSteps(date: LocalDate): Int {

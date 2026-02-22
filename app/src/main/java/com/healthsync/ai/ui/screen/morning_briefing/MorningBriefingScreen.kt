@@ -296,18 +296,22 @@ private fun buildMetricItems(metrics: HealthMetrics): List<MetricItem> {
     }
 
     // Sleep duration
-    val sleepHours = metrics.sleepDurationMinutes / 60.0
+    val sleepHrs = metrics.sleepDurationMinutes / 60
+    val sleepMins = metrics.sleepDurationMinutes % 60
+    val sleepHoursDecimal = metrics.sleepDurationMinutes / 60.0
     val sleepStatus = when {
-        sleepHours >= 7.0 -> MetricStatus.GOOD
-        sleepHours >= 6.0 -> MetricStatus.WARNING
+        sleepHoursDecimal >= 7.0 -> MetricStatus.GOOD
+        sleepHoursDecimal >= 6.0 -> MetricStatus.WARNING
         else -> MetricStatus.ALERT
     }
 
-    // Sleep debt — hours below 8h target; 2+ hours means avoid high-intensity
-    val sleepDebt = maxOf(0.0, 8.0 - sleepHours)
+    // Sleep debt — minutes below 8h target; 2+ hours means avoid high-intensity
+    val sleepDebtMins = maxOf(0, 480 - metrics.sleepDurationMinutes)
+    val sleepDebtHrs = sleepDebtMins / 60
+    val sleepDebtRemMins = sleepDebtMins % 60
     val sleepDebtStatus = when {
-        sleepDebt <= 0.5 -> MetricStatus.GOOD
-        sleepDebt <= 2.0 -> MetricStatus.WARNING
+        sleepDebtMins <= 30 -> MetricStatus.GOOD
+        sleepDebtMins <= 120 -> MetricStatus.WARNING
         else -> MetricStatus.ALERT
     }
 
@@ -321,8 +325,8 @@ private fun buildMetricItems(metrics: HealthMetrics): List<MetricItem> {
     val items = mutableListOf(
         MetricItem(Icons.Default.MonitorHeart, "HRV", "%.0f".format(metrics.hrvMs), "ms", formatSourceDate("hrv"), hrvStatus),
         MetricItem(Icons.Default.Favorite, "Resting HR", "${metrics.restingHeartRate}", "bpm", formatSourceDate("restingHr"), hrStatus),
-        MetricItem(Icons.Default.Bedtime, "Sleep", "%.1f".format(sleepHours), "hrs", formatSourceDate("sleep"), sleepStatus),
-        MetricItem(Icons.Default.Warning, "Sleep Debt", "%.1f".format(sleepDebt), "hrs", null, sleepDebtStatus),
+        MetricItem(Icons.Default.Bedtime, "Sleep", "${sleepHrs}h ${sleepMins}m", null, formatSourceDate("sleep"), sleepStatus),
+        MetricItem(Icons.Default.Warning, "Sleep Debt", if (sleepDebtMins == 0) "None" else "${sleepDebtHrs}h ${sleepDebtRemMins}m", null, null, sleepDebtStatus),
         MetricItem(Icons.Default.NightsStay, "Deep Sleep", "${metrics.deepSleepMinutes}", "min", formatSourceDate("sleep"), deepSleepStatus)
     )
 

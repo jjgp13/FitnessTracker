@@ -42,15 +42,9 @@ class DailyPlanViewModel @Inject constructor(
             result.onSuccess { plan ->
                 _uiState.update { it.copy(isLoading = false, dailyPlan = plan) }
             }.onFailure { e ->
-                val msg = when {
-                    e.message?.contains("quota", ignoreCase = true) == true ||
-                    e.message?.contains("429", ignoreCase = true) == true ||
-                    e.message?.contains("RESOURCE_EXHAUSTED", ignoreCase = true) == true ->
-                        "Gemini API quota exceeded. Please try again later."
-                    else ->
-                        e.message ?: "Failed to generate plan"
+                _uiState.update {
+                    it.copy(isLoading = false, errorMessage = e.message ?: "Failed to generate plan")
                 }
-                _uiState.update { it.copy(isLoading = false, errorMessage = msg) }
             }
         }
     }

@@ -1,5 +1,6 @@
 package com.healthsync.ai.data.repository
 
+import android.util.Log
 import com.healthsync.ai.data.healthconnect.HealthConnectDataSource
 import com.healthsync.ai.data.healthconnect.HealthConnectMapper
 import com.healthsync.ai.data.local.db.dao.HealthMetricsDao
@@ -14,6 +15,8 @@ import java.time.LocalDate
 import javax.inject.Inject
 import javax.inject.Singleton
 
+private const val TAG = "HealthMetrics"
+
 @Singleton
 class HealthMetricsRepositoryImpl @Inject constructor(
     private val healthConnectDataSource: HealthConnectDataSource,
@@ -27,13 +30,16 @@ class HealthMetricsRepositoryImpl @Inject constructor(
         val today = LocalDate.now()
         val yesterday = today.minusDays(1)
 
-        // === SLEEP: Eight Sleep first, fallback to Health Connect (Fitbit) ===
+        // === SLEEP: Eight Sleep API first, fallback to Health Connect ===
         var sleepDuration = 0; var deepSleep = 0; var remSleep = 0
         var lightSleep = 0; var awakeMins = 0; var sleepScore: Int? = null
         var hrvMs = 0.0; var restingHr = 0
 
+        Log.d(TAG, "Eight Sleep API authenticated: ${eightSleepDataSource.isAuthenticated()}")
+
         if (eightSleepDataSource.isAuthenticated()) {
             val result = eightSleepDataSource.getSleepMetrics(today.toString(), today.toString())
+            Log.d(TAG, "Eight Sleep API result: success=${result.isSuccess}, sleeps=${result.getOrNull()?.sleeps?.size ?: 0}")
             result.getOrNull()?.sleeps?.firstOrNull()?.let { session ->
                 if (session.startTime != null && session.endTime != null) {
                     try {
@@ -71,17 +77,25 @@ class HealthMetricsRepositoryImpl @Inject constructor(
             }
         }
 
-        // Fallback to Health Connect (Fitbit) for sleep
+        Log.d(TAG, "After Eight Sleep API: sleepDuration=$sleepDuration, hrvMs=$hrvMs, restingHr=$restingHr")
+
+        // Fallback to Health Connect for sleep (detects Eight Sleep / Fitbit via dataOrigin)
         if (sleepDuration == 0) {
-            // readSleepData now uses "last night" window (yesterday 6pm → today noon)
             val sleepSessions = healthConnectDataSource.readSleepData(today)
+            Log.d(TAG, "Health Connect sleep sessions: ${sleepSessions.size}")
+            sleepSessions.forEach { s ->
+                Log.d(TAG, "  Session source: ${s.metadata.dataOrigin.packageName}")
+            }
             sleepDuration = HealthConnectMapper.mapSleepDuration(sleepSessions)
             deepSleep = HealthConnectMapper.mapDeepSleepMinutes(sleepSessions)
             remSleep = HealthConnectMapper.mapRemSleepMinutes(sleepSessions)
             lightSleep = HealthConnectMapper.mapLightSleepMinutes(sleepSessions)
             awakeMins = HealthConnectMapper.mapAwakeMinutes(sleepSessions)
             if (sleepDuration > 0) {
-                dataSources["sleep"] = "Fitbit"
+                val source = sleepSessions.firstOrNull()
+                    ?.metadata?.dataOrigin?.packageName
+                    ?.let { mapPackageToSource(it) } ?: "Health Connect"
+                dataSources["sleep"] = source
                 metricDates["sleep"] = today.toString()
             }
         }
@@ -90,10 +104,10 @@ class HealthMetricsRepositoryImpl @Inject constructor(
         if (restingHr == 0) {
             for (daysBack in 0..2) {
                 val queryDate = today.minusDays(daysBack.toLong())
-                val hr = healthConnectDataSource.readHeartRate(queryDate)
-                if (hr != null && hr > 0) {
-                    restingHr = hr
-                    dataSources["restingHr"] = "Fitbit"
+                val hrResult = healthConnectDataSource.readHeartRate(queryDate)
+                if (hrResult != null && hrResult.first > 0) {
+                    restingHr = hrResult.first
+                    dataSources["restingHr"] = mapPackageToSource(hrResult.second)
                     metricDates["restingHr"] = queryDate.toString()
                     break
                 }
@@ -108,12 +122,18 @@ class HealthMetricsRepositoryImpl @Inject constructor(
                 val avg = HealthConnectMapper.mapHrvAverage(hrvRecords)
                 if (avg > 0) {
                     hrvMs = avg
-                    dataSources["hrv"] = "Fitbit"
+                    val source = hrvRecords.firstOrNull()
+                        ?.metadata?.dataOrigin?.packageName
+                        ?.let { mapPackageToSource(it) } ?: "Health Connect"
+                    dataSources["hrv"] = source
                     metricDates["hrv"] = queryDate.toString()
                     break
                 }
             }
         }
+
+        Log.d(TAG, "Final sources: $dataSources")
+        Log.d(TAG, "Final metrics: sleep=${sleepDuration}m, deep=${deepSleep}m, hrv=$hrvMs, rhr=$restingHr")
 
         // Weight: from Health Connect (Withings)
         val weightResult = healthConnectDataSource.readWeight()
@@ -183,5 +203,14 @@ class HealthMetricsRepositoryImpl @Inject constructor(
 
     override suspend fun saveMetrics(metrics: HealthMetrics) {
         healthMetricsDao.insert(metrics.toEntity())
+    }
+
+    private fun mapPackageToSource(packageName: String): String = when {
+        packageName.contains("eightsleep", ignoreCase = true) -> "Eight Sleep"
+        packageName.contains("fitbit", ignoreCase = true) -> "Fitbit"
+        packageName.contains("withings", ignoreCase = true) -> "Withings"
+        packageName.contains("samsung", ignoreCase = true) -> "Samsung Health"
+        packageName.contains("google", ignoreCase = true) -> "Google Fit"
+        else -> "Health Connect"
     }
 }
